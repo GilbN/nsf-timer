@@ -4,7 +4,7 @@
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
   import { saveTimerState, saveRoomState, clearTimerState, clearRoomState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
-  import { setSoundEnabled } from '../lib/audio.js'
+  import { setSoundEnabled, beepStart, beepStop, beepTargetUp, beepTargetDown } from '../lib/audio.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
   import SeriesProgress from '../components/SeriesProgress.svelte'
@@ -34,6 +34,29 @@
   $effect(() => {
     setSoundEnabled($preferences.soundEnabled)
   })
+
+  // Client-side audio: mirror the beeps that the host fires via TimerScheduler
+  if (initialIsClient) {
+    let prevPhase = get(timerState).phase
+    let prevTargetVisible = get(timerState).targetVisible
+
+    $effect(() => {
+      const { phase, targetVisible } = $timerState
+
+      if (phase !== prevPhase) {
+        if (phase === 'loading' || phase === 'shooting') beepStart()
+        else if (phase === 'stopped' && (prevPhase === 'loading' || prevPhase === 'shooting')) beepStop()
+      }
+
+      if (phase === 'shooting' && targetVisible !== prevTargetVisible) {
+        if (targetVisible) beepTargetUp()
+        else beepTargetDown()
+      }
+
+      prevPhase = phase
+      prevTargetVisible = targetVisible
+    })
+  }
 
   // Client connection status handling
   $effect(() => {
