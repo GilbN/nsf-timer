@@ -215,7 +215,7 @@ export class TimerScheduler {
 
     if (stage.type === 'duell' && exercise.targetVisibleTime) {
       this._startDuelShooting(exercise)
-    } else if (stage.type === 'rapid' && exercise.targetHiddenTime) {
+    } else if (exercise.targetHiddenTime) {
       this._startRapidShooting(exercise)
     } else {
       this._startPrecisionShooting(exercise)

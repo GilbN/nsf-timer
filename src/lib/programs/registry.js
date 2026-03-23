@@ -5,8 +5,10 @@
  * Reference: "SKYTEPROGRAMMER 25 METER NSF (BANE & FELT)"
  */
 
-const DEFAULT_LOADING_TIME = 5
+const DEFAULT_LOADING_TIME = 60
 const DEFAULT_TARGET_HIDDEN_TIME = 7
+const DEFAULT_TARGET_VISIBLE_TIME_DUEL = 3
+const TARGET_DISPLAY_TIME_OFFSET_DUEL = 0.29 // At the range the target uses .29 seconds to transition between hidden and visible, so this needs to be added to the visible time to get the correct timing for when the target is fully
 
 export const programs = [
   {
@@ -27,6 +29,7 @@ export const programs = [
           seriesCount: 6,
           shotsPerSeries: 5,
           timePerSeries: 300,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -38,8 +41,8 @@ export const programs = [
           seriesCount: 6,
           shotsPerSeries: 5,
           shotsPerShowing: 1,
-          targetVisibleTime: 3,
-          targetHiddenTime: 7,
+          targetVisibleTime: DEFAULT_TARGET_VISIBLE_TIME_DUEL + TARGET_DISPLAY_TIME_OFFSET_DUEL,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -63,6 +66,7 @@ export const programs = [
           seriesCount: 4,
           shotsPerSeries: 5,
           timePerSeries: 150,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -74,6 +78,7 @@ export const programs = [
           seriesCount: 4,
           shotsPerSeries: 5,
           timePerSeries: 20,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -85,6 +90,7 @@ export const programs = [
           seriesCount: 4,
           shotsPerSeries: 5,
           timePerSeries: 10,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -151,8 +157,8 @@ export const programs = [
           seriesCount: 2,
           shotsPerSeries: 5,
           shotsPerShowing: 1,
-          targetVisibleTime: 3,
-          targetHiddenTime: 7,
+          targetVisibleTime: DEFAULT_TARGET_VISIBLE_TIME_DUEL + TARGET_DISPLAY_TIME_OFFSET_DUEL,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },

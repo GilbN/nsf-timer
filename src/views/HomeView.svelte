@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte'
   import { currentView, roomState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import { PeerHost } from '../lib/peer/PeerHost.js'
@@ -8,12 +9,22 @@
   import { saveRoomState, loadRoomHistory, clearRoomHistory } from '../lib/storage.js'
   import LangToggle from '../components/LangToggle.svelte'
 
+  let joinCodeInput
   let joinCode = $state('')
   let joinName = $state('')
   let joinLane = $state('')
   let error = $state('')
   let connecting = $state(false)
   let recentRooms = $state(loadRoomHistory())
+
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    !!window.navigator.standalone
+
+  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+  let showInstallCard = $state(false)
 
   async function createRoom() {
     unlockAudio()
@@ -113,6 +124,29 @@
     recentRooms = []
   }
 
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search)
+    const room = params.get('room')
+    if (room) {
+      joinCode = room.toUpperCase().slice(0, 4)
+      history.replaceState({}, '', window.location.pathname)
+      setTimeout(() => joinCodeInput?.focus(), 50)
+    }
+
+    if (!isStandalone && (window.__pwaInstallPrompt || isIos)) {
+      showInstallCard = true
+    }
+  })
+
+  async function installApp() {
+    const prompt = window.__pwaInstallPrompt
+    if (!prompt) return
+    await prompt.prompt()
+    await prompt.userChoice
+    showInstallCard = false
+    window.__pwaInstallPrompt = null
+  }
+
   function openStopwatch() {
     unlockAudio()
     currentView.set('stopwatch')
@@ -162,6 +196,7 @@
       <div class="join-row">
         <input
           type="text"
+          bind:this={joinCodeInput}
           bind:value={joinCode}
           placeholder={$t('enterCode')}
           maxlength="4"
@@ -179,6 +214,7 @@
           bind:value={joinName}
           placeholder={$t('yourName')}
           class="join-detail-input"
+          autocomplete="name"
         />
         <input
           type="text"
@@ -187,6 +223,7 @@
           maxlength="3"
           class="join-detail-input lane-input"
           inputmode="numeric"
+          autocomplete="off"
         />
       </div>
     </div>
@@ -199,6 +236,27 @@
       </svg>
       {$t('stopwatch')}
     </button>
+
+    {#if showInstallCard}
+      <div class="install-card">
+        <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v13M7 11l5 5 5-5"/>
+          <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
+        </svg>
+        <span class="install-text">{$t('installApp')}</span>
+        {#if isIos}
+          <span class="install-hint">{$t('installIosHint')}</span>
+        {/if}
+        <div class="install-actions">
+          {#if !isIos}
+            <button class="btn-primary btn-install" onclick={installApp}>
+              {$t('installApp')}
+            </button>
+          {/if}
+          <button class="btn-ghost-sm" onclick={() => showInstallCard = false}>✕</button>
+        </div>
+      </div>
+    {/if}
   </div>
 
   {#if recentRooms.length > 0}
@@ -492,5 +550,50 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .install-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 230, 118, 0.06);
+    border: 1px solid rgba(0, 230, 118, 0.2);
+    border-radius: var(--radius);
+  }
+
+  .install-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .install-text {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .install-hint {
+    width: 100%;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding-left: calc(20px + 0.75rem);
+  }
+
+  .install-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+  }
+
+  .btn-install {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.9rem;
+    min-height: unset;
   }
 </style>

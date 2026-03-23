@@ -36,18 +36,22 @@ function playTone(frequency, duration, type = 'square') {
 
 export function beepStart() {
   playTone(880, 0.15)
+  navigator.vibrate?.([100])
 }
 
 export function beepStop() {
   playTone(440, 0.3)
+  navigator.vibrate?.([100, 50, 100])
 }
 
 export function beepTargetUp() {
   playTone(1200, 0.1)
+  navigator.vibrate?.([200])
 }
 
 export function beepTargetDown() {
   playTone(600, 0.15)
+  navigator.vibrate?.([50])
 }
 
 // Must be called from a user gesture to unlock audio on mobile

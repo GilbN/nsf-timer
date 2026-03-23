@@ -4,6 +4,9 @@ import { preferences } from './stores.js'
 const translations = {
   no: {
     appName: 'OPK Timer',
+    shareRoomPrefix: 'Bli med i OPK Timer-rom:',
+    installApp: 'Installer app',
+    installIosHint: 'Trykk på Del-knappen og velg «Legg til på Hjem-skjerm»',
     createRoom: 'Opprett rom',
     joinRoom: 'Bli med i rom',
     stopwatch: 'Stoppeklokke',
@@ -12,7 +15,7 @@ const translations = {
     join: 'Bli med',
     back: 'Tilbake',
     start: 'Start',
-    startNextSeries: 'Start neste serie',
+    startNextSeries: 'Start serie',
     pause: 'Pause',
     resume: 'Fortsett',
     stop: 'Stopp',
@@ -97,6 +100,9 @@ const translations = {
   },
   en: {
     appName: 'OPK Timer',
+    shareRoomPrefix: 'Join OPK Timer room:',
+    installApp: 'Install App',
+    installIosHint: 'Tap the Share button and select "Add to Home Screen"',
     createRoom: 'Create Room',
     joinRoom: 'Join Room',
     stopwatch: 'Stopwatch',
@@ -105,7 +111,7 @@ const translations = {
     join: 'Join',
     back: 'Back',
     start: 'Start',
-    startNextSeries: 'Start Next Series',
+    startNextSeries: 'Start Series',
     pause: 'Pause',
     resume: 'Resume',
     stop: 'Stop',

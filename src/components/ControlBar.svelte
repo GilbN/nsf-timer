@@ -2,7 +2,7 @@
   import { timerState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
 
-  let { onStart, onPause, onResume, onStop, onNext, onReset, nextStageName = null } = $props()
+  let { onStart, onPause, onResume, onStop, onNext, onReset } = $props()
 </script>
 
 <div class="control-bar">
@@ -15,7 +15,7 @@
       {#if $timerState.phase === 'stopped'}
         <button class="btn-action btn-next" onclick={onNext}>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
-          {$t('nextExercise')}{nextStageName ? ` (${nextStageName})` : ''}
+          {$t('nextExercise')}
         </button>
       {/if}
     {:else if $timerState.phase === 'loading' || $timerState.phase === 'shooting'}

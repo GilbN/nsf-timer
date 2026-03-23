@@ -33,7 +33,7 @@
             <span class="jam-count" class:warning={peer.jamsUsed >= 1} class:maxed={peer.jamsUsed >= 2}>
               {peer.jamsUsed}/2
             </span>
-            {#if canReshoot && peer.jamsUsed < 2}
+            {#if canReshoot && peer.canJam}
               <button class="btn-reshoot" onclick={() => onReshoot(peer)}>
                 {$t('reshoot')}
               </button>

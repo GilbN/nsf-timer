@@ -128,7 +128,7 @@ export class PeerHost {
   /**
    * Get peer list with details for UI
    */
-  getPeerDetails() {
+  getPeerDetails(stageKey = null) {
     const peers = []
     for (const [peerId, entry] of this.connections) {
       peers.push({
@@ -136,6 +136,7 @@ export class PeerHost {
         name: entry.name,
         lane: entry.lane,
         jamsUsed: entry.jamsUsed,
+        canJam: entry.jamsUsed < 2 && (stageKey === null || !entry.jamStageKeys.has(stageKey)),
       })
     }
     // Sort by lane number (numeric), then name
@@ -148,7 +149,9 @@ export class PeerHost {
   }
 
   _syncRoomState() {
-    const peers = this.getPeerDetails()
+    const state = get(timerState)
+    const stageKey = state?.stageIndex != null ? `stage${state.stageIndex}` : null
+    const peers = this.getPeerDetails(stageKey)
     roomState.update((s) => ({
       ...s,
       code: this.code,
@@ -240,8 +243,12 @@ export class PeerHost {
    * Broadcast full timer state and cache it for new connections
    */
   broadcastState(state) {
+    const prevStageIndex = this._lastTimerState?.stageIndex
     this._lastTimerState = state
     this.broadcast(MSG.STATE_SYNC, state)
+    if (state.stageIndex !== prevStageIndex) {
+      this._syncRoomState()
+    }
   }
 
   /**

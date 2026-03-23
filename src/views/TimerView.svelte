@@ -3,8 +3,9 @@
   import { currentView, roomState, timerState, preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
-  import { saveTimerState, saveRoomState, clearTimerState, clearRoomState, addRoomToHistory } from '../lib/storage.js'
+  import { saveTimerState, saveRoomState, clearTimerState, clearRoomState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
   import { setSoundEnabled } from '../lib/audio.js'
+  import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
   import SeriesProgress from '../components/SeriesProgress.svelte'
   import ControlBar from '../components/ControlBar.svelte'
@@ -19,22 +20,6 @@
   let isHost = $derived($roomState.isHost || initialIsHost)
   let program = $derived(getProgramById($timerState.programId))
   let stage = $derived(program?.stages[$timerState.stageIndex])
-  let nextStageName = $derived.by(() => {
-    if (!program || !stage) return null
-    const nextExIdx = $timerState.exerciseIndex + 1
-    if (nextExIdx < stage.exercises.length) {
-      return getLocalizedName(stage.name, $preferences.lang)
-    }
-    const nextStageIdx = $timerState.stageIndex + 1
-    if (nextStageIdx < program.stages.length) {
-      return getLocalizedName(program.stages[nextStageIdx].name, $preferences.lang)
-    }
-    return null
-  })
-  let displayMode = $derived(
-    stage?.type === 'duell' || stage?.type === 'rapid' ? 'duell' : 'precision'
-  )
-
   let connectionStatus = $state('connected')
 
   // Persist timer state on changes (host only)
@@ -64,6 +49,33 @@
           connectionStatus = 'disconnected'
         }
       })
+    }
+  })
+
+  // Effect: acquire/release based on phase
+  $effect(() => {
+    const phase = $timerState.phase
+    if (phase === 'loading' || phase === 'shooting') {
+      acquireWakeLock()
+    } else {
+      releaseWakeLock()
+    }
+  })
+
+  // Effect: re-acquire after OS revocation (battery saver, interruption)
+  $effect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        const phase = $timerState.phase
+        if (phase === 'loading' || phase === 'shooting') {
+          acquireWakeLock()
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      releaseWakeLock()
     }
   })
 
@@ -112,10 +124,13 @@
   function disconnect() {
     if (!confirm(get(t)('confirmDisconnect'))) return
     if ($roomState.code) {
+      const savedRoom = loadRoomState()
       addRoomToHistory({
         code: $roomState.code,
         isHost: $roomState.isHost,
         programId: $timerState.programId,
+        name: savedRoom?.name,
+        lane: savedRoom?.lane,
       })
     }
     if (window.__opkScheduler) {
@@ -176,7 +191,7 @@
 
   <!-- Timer centrepiece -->
   <div class="timer-area">
-    <TimerDisplay mode={displayMode} />
+    <TimerDisplay />
   </div>
 
   <!-- Series info -->
@@ -191,7 +206,6 @@
       onStop={handleStop}
       onNext={handleNext}
       onReset={handleReset}
-      {nextStageName}
     />
     {#if $roomState.connectedPeers?.length > 0}
       <PeerList onReshoot={handleReshoot} />
@@ -204,9 +218,8 @@
       onStop={handleStop}
       onNext={handleNext}
       onReset={handleReset}
-      {nextStageName}
     />
-  {:else}
+  {:else if $timerState.phase === 'idle'}
     <div class="client-hint">{$t('waitingForHost')}</div>
   {/if}
 

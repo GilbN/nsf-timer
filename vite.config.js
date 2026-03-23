@@ -2,10 +2,16 @@ import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: process.env.VITE_BASE_PATH || '/',
+  server: command === 'serve' ? {
+    https: true,
+    host: true
+  } : undefined,
   plugins: [
+    ...(command === 'serve' ? [basicSsl()] : []),
     tailwindcss(),
     svelte(),
     VitePWA({
@@ -28,4 +34,4 @@ export default defineConfig({
       },
     }),
   ],
-})
+}))

@@ -2,12 +2,9 @@
   import { timerState, formattedTime } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
 
-  let { mode = 'precision' } = $props()
-
   let phase = $derived($timerState.phase)
-  let isTargetUp = $derived($timerState.targetVisible && mode === 'duell')
-  let isTargetDown = $derived(!$timerState.targetVisible && mode === 'duell' && (phase === 'shooting' || phase === 'stopped'))
-  let isDuel = $derived(mode === 'duell' && (phase === 'shooting' || phase === 'stopped'))
+  let isTargetUp = $derived($timerState.targetVisible && phase === 'shooting')
+  let isTargetDown = $derived(!$timerState.targetVisible && phase === 'shooting')
 </script>
 
 <div
@@ -28,8 +25,8 @@
     </div>
   {/if}
 
-  <!-- Duel target indicator -->
-  {#if isDuel}
+  <!-- Target indicator -->
+  {#if phase === 'shooting'}
     <div class="target-indicator" class:up={isTargetUp}>
       {#if isTargetUp}
         <svg class="target-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -49,11 +46,11 @@
 
   <!-- Main time digits -->
   <div class="time" class:glow={isTargetUp}>
-    {#if isDuel}
+    {#if phase === 'shooting'}
       <span class="digits super">{$formattedTime.totalSeconds}</span>
     {:else}
       <span class="digits">{$formattedTime.minutes}</span>
-      <span class="colon" class:blink={phase === 'shooting'}>:</span>
+      <span class="colon">:</span>
       <span class="digits">{$formattedTime.seconds}</span>
     {/if}
   </div>
@@ -175,10 +172,6 @@
     align-self: baseline;
     margin-bottom: 0.03em;
     transition: color 0.4s ease;
-  }
-
-  .colon.blink {
-    animation: blink 1s step-end infinite;
   }
 
   /* ── Digit colors by phase ── */
