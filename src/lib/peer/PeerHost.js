@@ -98,6 +98,7 @@ export class PeerHost {
         }
         entry.name = msg.payload.name || ''
         entry.lane = lane
+        try { conn.send(createMessage(MSG.JOIN_ACCEPTED)) } catch {}
         this._syncRoomState()
       }
     })

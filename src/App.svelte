@@ -15,6 +15,12 @@
     preferences.set(savedPrefs)
   }
 
+  // Apply font scale to html element whenever preferences change
+  $effect(() => {
+    const scale = $preferences.textScale ?? 1
+    document.documentElement.style.fontSize = (scale * 100) + '%'
+  })
+
   // Attempt session restore on page load
   restoreSession()
 

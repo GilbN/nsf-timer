@@ -30,6 +30,8 @@ export const timerState = writable({
 export const preferences = writable({
   lang: 'no',
   soundEnabled: true,
+  textScale: 1,   // 1 | 1.2 | 1.4
+  wakeLockEnabled: false,
 })
 
 // Derived: formatted time

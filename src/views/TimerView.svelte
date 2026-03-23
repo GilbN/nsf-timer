@@ -3,7 +3,7 @@
   import { currentView, roomState, timerState, preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
-  import { saveTimerState, saveRoomState, clearTimerState, clearRoomState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
+  import { saveTimerState, saveRoomState, savePreferences, clearTimerState, clearRoomState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
   import { setSoundEnabled } from '../lib/audio.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
@@ -13,6 +13,7 @@
   import RoomCode from '../components/RoomCode.svelte'
   import ConnectionStatus from '../components/ConnectionStatus.svelte'
   import LangToggle from '../components/LangToggle.svelte'
+  import FontSizeToggle from '../components/FontSizeToggle.svelte'
 
   // Capture role at mount time so it's stable even if roomState changes on disconnect
   const initialIsHost = get(roomState).isHost
@@ -52,10 +53,14 @@
     }
   })
 
-  // Effect: acquire/release based on phase
-  $effect(() => {
+  function shouldHoldWakeLock() {
     const phase = $timerState.phase
-    if (phase === 'loading' || phase === 'shooting') {
+    return $preferences.wakeLockEnabled || phase === 'loading' || phase === 'shooting'
+  }
+
+  // Effect: acquire/release based on phase or manual toggle
+  $effect(() => {
+    if (shouldHoldWakeLock()) {
       acquireWakeLock()
     } else {
       releaseWakeLock()
@@ -65,11 +70,8 @@
   // Effect: re-acquire after OS revocation (battery saver, interruption)
   $effect(() => {
     function onVisibilityChange() {
-      if (document.visibilityState === 'visible') {
-        const phase = $timerState.phase
-        if (phase === 'loading' || phase === 'shooting') {
-          acquireWakeLock()
-        }
+      if (document.visibilityState === 'visible' && shouldHoldWakeLock()) {
+        acquireWakeLock()
       }
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
@@ -78,6 +80,14 @@
       releaseWakeLock()
     }
   })
+
+  function toggleWakeLock() {
+    preferences.update((p) => {
+      const updated = { ...p, wakeLockEnabled: !p.wakeLockEnabled }
+      savePreferences(updated)
+      return updated
+    })
+  }
 
   function handleStart() { window.__opkScheduler?.startSeries() }
   function handlePause() { window.__opkScheduler?.pause() }
@@ -156,9 +166,25 @@
   <div class="top-bar">
     {#if $roomState.code}
       <RoomCode code={$roomState.code} />
-      <ConnectionStatus status={connectionStatus} />
+    {/if}
+    {#if initialIsClient}
+      <ConnectionStatus status={connectionStatus} variant="dot" />
     {/if}
     <div class="top-actions">
+      <button class="icon-btn" class:active={$preferences.wakeLockEnabled} onclick={toggleWakeLock} title={$t('keepAwake')}>
+        {#if $preferences.wakeLockEnabled}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        {/if}
+      </button>
       <button class="icon-btn" onclick={toggleSound} title={$t('sound')}>
         {#if $preferences.soundEnabled}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -174,9 +200,15 @@
           </svg>
         {/if}
       </button>
+      <FontSizeToggle />
       <LangToggle />
     </div>
   </div>
+
+  <!-- Connection status banner (clients only, non-connected states) -->
+  {#if initialIsClient}
+    <ConnectionStatus status={connectionStatus} variant="banner" />
+  {/if}
 
   <!-- Reshoot banner -->
   {#if $timerState.isReshoot && $timerState.reshootPeerName}
@@ -229,6 +261,8 @@
       <button class="btn-text" onclick={changeProgram}>{$t('changeProgram')}</button>
       <span class="sep">·</span>
     {/if}
+    <button class="btn-text" onclick={() => window.location.reload()}>{$t('refresh')}</button>
+    <span class="sep">·</span>
     <button class="btn-text danger" onclick={disconnect}>{$t('disconnect')}</button>
   </div>
 </div>
@@ -269,6 +303,10 @@
     width: 18px;
     height: 18px;
     color: var(--text-secondary);
+  }
+
+  .icon-btn.active svg {
+    color: var(--accent);
   }
 
   /* ── Reshoot banner ── */

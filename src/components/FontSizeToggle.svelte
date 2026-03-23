@@ -2,21 +2,24 @@
   import { preferences } from '../lib/stores.js'
   import { savePreferences } from '../lib/storage.js'
 
-  function toggle() {
-    preferences.update((p) => {
-      const updated = { ...p, lang: p.lang === 'no' ? 'en' : 'no' }
+  const SCALES = [1, 1.2, 1.4]
+
+  function cycle() {
+    preferences.update(p => {
+      const next = SCALES[(SCALES.indexOf(p.textScale ?? 1) + 1) % SCALES.length]
+      const updated = { ...p, textScale: next }
       savePreferences(updated)
       return updated
     })
   }
 </script>
 
-<button class="lang-toggle" onclick={toggle}>
-  {$preferences.lang === 'no' ? 'EN' : 'NO'}
+<button class="font-size-toggle" onclick={cycle} title="Text size">
+  {#if ($preferences.textScale ?? 1) >= 1.4}A+{:else if ($preferences.textScale ?? 1) >= 1.2}A{:else}aA{/if}
 </button>
 
 <style>
-  .lang-toggle {
+  .font-size-toggle {
     background: var(--bg-surface);
     color: var(--text-secondary);
     border: 1px solid rgba(255,255,255,0.06);
@@ -34,7 +37,7 @@
     transition: color 0.15s, border-color 0.15s;
   }
 
-  .lang-toggle:hover {
+  .font-size-toggle:hover {
     color: var(--text-primary);
     border-color: rgba(255,255,255,0.15);
   }

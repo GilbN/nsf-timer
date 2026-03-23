@@ -70,33 +70,30 @@ export class PeerClient {
         this.conn = this.peer.connect(hostId, { reliable: true })
 
         this.conn.on('open', () => {
-          this._reconnectAttempt = 0
-
-          roomState.update((s) => ({
-            ...s,
-            code: this.code,
-            isHost: false,
-          }))
-
-          // Send identity to host
+          // Send identity to host — wait for JOIN_ACCEPTED before resolving
           this.conn.send({
             type: MSG.JOIN_INFO,
             payload: { name: this.name, lane: this.lane },
             ts: Date.now(),
           })
-
-          this._startPing()
-          this._emitStatus('connected')
-          resolve(this.code)
         })
 
         this.conn.on('data', (msg) => {
+          if (msg.type === MSG.JOIN_ACCEPTED) {
+            this._reconnectAttempt = 0
+            roomState.update((s) => ({ ...s, code: this.code, isHost: false }))
+            this._startPing()
+            this._emitStatus('connected')
+            resolve(this.code)
+            return
+          }
           // Handle lane rejection during join
           if (msg.type === MSG.LANE_REJECTED) {
             this._stopPing()
             this._clearReconnect()
             this._destroyed = true
             this._emitStatus('laneRejected')
+            reject(new Error('laneRejected'))
             return
           }
           this._handleMessage(msg)

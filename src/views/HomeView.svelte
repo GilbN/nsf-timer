@@ -8,6 +8,7 @@
   import { unlockAudio } from '../lib/audio.js'
   import { saveRoomState, loadRoomHistory, clearRoomHistory } from '../lib/storage.js'
   import LangToggle from '../components/LangToggle.svelte'
+  import FontSizeToggle from '../components/FontSizeToggle.svelte'
 
   let joinCodeInput
   let joinCode = $state('')
@@ -62,22 +63,15 @@
     try {
       const client = new PeerClient()
       window.__opkClient = client
-      let laneRejected = false
-      client.onStatusChange((status) => {
-        if (status === 'laneRejected') {
-          laneRejected = true
-          error = $t('laneTaken')
-          connecting = false
-          client.destroy()
-          window.__opkClient = null
-        }
-      })
       const code = await client.joinRoom(joinCode.trim(), { name: joinName.trim(), lane: joinLane.trim() })
-      if (laneRejected) return
       saveRoomState({ code, isHost: false, name: joinName.trim(), lane: joinLane.trim() })
       currentView.set('timer')
     } catch (e) {
-      error = e.message || 'Failed to join room'
+      if (e.message === 'laneRejected') {
+        error = $t('laneTaken')
+      } else {
+        error = e.message || 'Failed to join room'
+      }
       window.__opkClient = null
     } finally {
       connecting = false
@@ -176,7 +170,10 @@
       </svg>
       <span class="wordmark-text">{$t('appName')}</span>
     </div>
-    <LangToggle />
+    <div class="header-actions">
+      <FontSizeToggle />
+      <LangToggle />
+    </div>
   </div>
 
   <p class="tagline">NSF 25m Competition Timer</p>
@@ -303,6 +300,12 @@
   .header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.4rem;
     align-items: center;
   }
 

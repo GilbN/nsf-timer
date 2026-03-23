@@ -13,7 +13,8 @@ export const MSG = {
   PING: 'PING',                   // Presence heartbeat
   JOIN_INFO: 'JOIN_INFO',         // { name, lane }
 
-  // Host → Client (rejection)
+  // Host → Client (join response)
+  JOIN_ACCEPTED: 'JOIN_ACCEPTED', // join confirmed
   LANE_REJECTED: 'LANE_REJECTED', // { lane, message }
 }
 
