@@ -21,7 +21,9 @@
   <div class="series-progress">
     <span class="tag prog">{getLocalizedName(program.name, lang)}</span>
     <span class="divider">·</span>
-    <span class="tag stage">{getLocalizedName(stage.name, lang)}</span>
+    <span class="tag stage" class:trial={stage.isTrialStage}>
+      {getLocalizedName(stage.name, lang)}
+    </span>
     {#if stage.exercises.length > 1}
       <span class="divider">·</span>
       <span class="tag">{$t('exercise')} {$timerState.exerciseIndex + 1}/{stage.exercises.length}</span>
@@ -68,6 +70,10 @@
 
   .tag.stage {
     color: var(--accent);
+  }
+
+  .tag.stage.trial {
+    color: var(--warning);
   }
 
   .tag.duel {

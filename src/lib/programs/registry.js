@@ -22,6 +22,19 @@ export const programs = [
     trialShots: 5,
     stages: [
       {
+        id: 'trial-ds1',
+        name: { no: 'Prøveserie 1', en: 'Trial 1' },
+        isTrialStage: true,
+        type: 'precision',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 300,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
+      {
         id: 'ds1',
         name: { no: 'Presisjon', en: 'Precision' },
         type: 'precision',
@@ -30,6 +43,18 @@ export const programs = [
           shotsPerSeries: 5,
           timePerSeries: 300,
           targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
+      {
+        id: 'trial-ds2',
+        name: { no: 'Prøveserie 2', en: 'Trial 2' },
+        isTrialStage: true,
+        type: 'precision',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 300,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -58,6 +83,19 @@ export const programs = [
     totalCompetitionShots: 60,
     trialShots: 5,
     stages: [
+      {
+        id: 'trial',
+        name: { no: 'Prøveserie', en: 'Trial' },
+        isTrialStage: true,
+        type: 'precision',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 150,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
       {
         id: 'ds1',
         name: { no: '150 sekunder', en: '150 seconds' },
@@ -107,6 +145,19 @@ export const programs = [
     trialShots: 5,
     stages: [
       {
+        id: 'trial-ds1',
+        name: { no: 'Prøveserie 1', en: 'Trial 1' },
+        isTrialStage: true,
+        type: 'rapid',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 8,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
+      {
         id: 'ds1',
         name: { no: 'Delserie 1', en: 'Stage 1' },
         type: 'rapid',
@@ -115,6 +166,19 @@ export const programs = [
           { seriesCount: 2, shotsPerSeries: 5, timePerSeries: 6, targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME, loadingTime: DEFAULT_LOADING_TIME },
           { seriesCount: 2, shotsPerSeries: 5, timePerSeries: 4, targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME, loadingTime: DEFAULT_LOADING_TIME },
         ],
+      },
+      {
+        id: 'trial-ds2',
+        name: { no: 'Prøveserie 2', en: 'Trial 2' },
+        isTrialStage: true,
+        type: 'rapid',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 8,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
       },
       {
         id: 'ds2',
@@ -138,6 +202,18 @@ export const programs = [
     totalCompetitionShots: 30,
     trialShots: 5,
     stages: [
+      {
+        id: 'trial',
+        name: { no: 'Prøveserie', en: 'Trial' },
+        isTrialStage: true,
+        type: 'precision',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 150,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
       {
         id: 'ds1',
         name: { no: 'Presisjon', en: 'Precision' },
@@ -200,6 +276,19 @@ export const programs = [
     totalCompetitionShots: 60,
     trialShots: 5,
     stages: [
+      {
+        id: 'trial',
+        name: { no: 'Prøveserie', en: 'Trial' },
+        isTrialStage: true,
+        type: 'rapid',
+        exercises: [{
+          seriesCount: 1,
+          shotsPerSeries: 5,
+          timePerSeries: 10,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
+          loadingTime: DEFAULT_LOADING_TIME,
+        }],
+      },
       {
         id: 'ds1',
         name: { no: '10 sekunder', en: '10 seconds' },

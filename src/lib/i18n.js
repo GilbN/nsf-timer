@@ -105,8 +105,8 @@ const translations = {
     competitionShots: 'Konkurranseskudd',
     weaponGroups: 'Våpengrupper',
     totalShots: 'Totalt skudd',
-    jumpToPosition: 'Hopp til posisjon',
-    jumpTo: 'Hopp til',
+    jumpToPosition: 'Velg delserie',
+    jumpTo: 'Velg',
   },
   en: {
     appName: 'OPK Timer',
@@ -211,8 +211,8 @@ const translations = {
     competitionShots: 'Competition Shots',
     weaponGroups: 'Weapon Groups',
     totalShots: 'Total Shots',
-    jumpToPosition: 'Jump to Position',
-    jumpTo: 'Jump to',
+    jumpToPosition: 'Select stage',
+    jumpTo: 'Select',
   },
 }
 

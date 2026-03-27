@@ -47,6 +47,7 @@
           <button
             class="option-btn"
             class:selected={selectedStageIdx === i}
+            class:trial-stage={stage.isTrialStage}
             onclick={() => selectStage(i)}
           >
             {getLocalizedName(stage.name, $preferences.lang)}
@@ -172,6 +173,17 @@
     color: #0d0d1a;
     border-color: var(--accent);
     font-weight: 700;
+  }
+
+  .option-btn.trial-stage {
+    color: var(--warning);
+    border-color: rgba(255, 181, 71, 0.25);
+  }
+
+  .option-btn.trial-stage.selected {
+    background: var(--warning);
+    border-color: var(--warning);
+    color: #0d0d1a;
   }
 
   .modal-actions {

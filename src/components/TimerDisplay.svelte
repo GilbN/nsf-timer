@@ -1,10 +1,13 @@
 <script>
   import { timerState, formattedTime } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
+  import { getProgramById } from '../lib/programs/registry.js'
 
   let phase = $derived($timerState.phase)
   let isTargetUp = $derived($timerState.targetVisible && phase === 'shooting')
   let isTargetDown = $derived(!$timerState.targetVisible && phase === 'shooting')
+  let program = $derived(getProgramById($timerState.programId))
+  let isTrialStage = $derived(program?.stages[$timerState.stageIndex]?.isTrialStage ?? false)
 </script>
 
 <div
@@ -15,7 +18,19 @@
   class:phase-stopped={phase === 'stopped'}
   class:target-up={isTargetUp}
   class:target-down={isTargetDown}
+  class:trial={isTrialStage}
 >
+  <!-- Trial indicator -->
+  {#if isTrialStage}
+    <div class="trial-indicator">
+      <svg class="trial-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+        <line x1="4" y1="22" x2="4" y2="15"/>
+      </svg>
+      {$t('trial')}
+    </div>
+  {/if}
+
   <!-- Phase banner strip -->
   {#if phase !== 'idle'}
     <div class="phase-banner">
@@ -192,4 +207,37 @@
     color: var(--accent);
     animation: glow-green 2s ease-in-out infinite;
   }
+
+  /* ── Trial indicator ── */
+  .trial-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.4rem 1.2rem;
+    border-radius: 100px;
+    background: rgba(255, 181, 71, 0.12);
+    color: var(--warning);
+    border: 1px solid rgba(255, 181, 71, 0.25);
+  }
+
+  .trial-icon {
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+  }
+
+  /* ── Trial stage: phase banner amber ── */
+  .trial.phase-loading .phase-rule,
+  .trial.phase-shooting .phase-rule,
+  .trial.phase-stopped .phase-rule,
+  .trial.phase-paused .phase-rule  { background: var(--warning); }
+
+  .trial.phase-loading .phase-text,
+  .trial.phase-shooting .phase-text,
+  .trial.phase-stopped .phase-text,
+  .trial.phase-paused .phase-text  { color: var(--warning); }
 </style>
