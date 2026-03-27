@@ -13,6 +13,7 @@
   import RoomCode from '../components/RoomCode.svelte'
   import ConnectionStatus from '../components/ConnectionStatus.svelte'
   import SettingsMenu from '../components/SettingsMenu.svelte'
+  import JumpToModal from '../components/JumpToModal.svelte'
 
   // Capture role at mount time so it's stable even if roomState changes on disconnect
   const initialIsHost = get(roomState).isHost
@@ -109,6 +110,8 @@
   function handleResume() { window.__opkScheduler?.resume() }
   function handleStop() { window.__opkScheduler?.stop() }
   function handleNext() { window.__opkScheduler?.nextExercise() }
+
+  let showJumpModal = $state(false)
 
   function handleReset() {
     if (!confirm(get(t)('confirmReset'))) return
@@ -256,12 +259,18 @@
     {#if isHost && ($timerState.phase === 'idle' || $timerState.phase === 'stopped')}
       <button class="btn-text" onclick={changeProgram}>{$t('changeProgram')}</button>
       <span class="sep">·</span>
+      <button class="btn-text" onclick={() => (showJumpModal = true)}>{$t('jumpToPosition')}</button>
+      <span class="sep">·</span>
     {/if}
     <button class="btn-text" onclick={() => window.location.reload()}>{$t('refresh')}</button>
     <span class="sep">·</span>
     <button class="btn-text danger" onclick={disconnect}>{$t('disconnect')}</button>
   </div>
 </div>
+
+{#if showJumpModal && program}
+  <JumpToModal {program} onClose={() => (showJumpModal = false)} />
+{/if}
 
 <style>
   .timer-view {

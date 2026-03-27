@@ -450,6 +450,37 @@ export class TimerScheduler {
     }
   }
 
+  /**
+   * Jump to a specific stage/exercise/series without resetting the whole program.
+   * Used when the host needs to restart mid-competition from a specific position.
+   */
+  jumpTo(stageIndex, exerciseIndex, seriesIndex) {
+    if (!this.program) return
+    const stage = this.program.stages[stageIndex]
+    if (!stage) return
+    const exercise = stage.exercises[exerciseIndex]
+    if (!exercise) return
+    if (seriesIndex < 0 || seriesIndex >= exercise.seriesCount) return
+
+    this.engine.stop()
+    this._clearDuelTimer()
+
+    this._updateState({
+      phase: 'idle',
+      stageIndex,
+      exerciseIndex,
+      seriesIndex,
+      remainingMs: 0,
+      totalMs: 0,
+      targetVisible: false,
+      duelShowingIndex: 0,
+      phaseStartedAt: null,
+      isReshoot: false,
+      reshootPeerName: null,
+      stageComplete: false,
+    })
+  }
+
   stop() {
     this.engine.stop()
     this._clearDuelTimer()
