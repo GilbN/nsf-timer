@@ -33,6 +33,8 @@ export const preferences = writable({
   soundEnabled: true,
   textScale: 1,   // 1 | 1.2 | 1.4
   wakeLockEnabled: false,
+  countdownFormat: 'seconds',  // 'seconds' | 'mmss'
+  stopwatchFormat: 'mmss',     // 'mmss' | 'seconds'
 })
 
 // Derived: formatted time

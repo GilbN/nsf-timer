@@ -107,6 +107,10 @@ const translations = {
     totalShots: 'Totalt skudd',
     jumpToPosition: 'Velg delserie',
     jumpTo: 'Velg',
+    countdownFormat: 'Nedtellingformat',
+    stopwatchFormat: 'Stoppeklokkeformat',
+    countdownSeconds: 'Sekunder',
+    countdownMinSec: 'Min:Sek',
   },
   en: {
     appName: 'OPK Timer',
@@ -213,6 +217,10 @@ const translations = {
     totalShots: 'Total Shots',
     jumpToPosition: 'Select stage',
     jumpTo: 'Select',
+    countdownFormat: 'Countdown format',
+    stopwatchFormat: 'Stopwatch format',
+    countdownSeconds: 'Seconds',
+    countdownMinSec: 'Min:Sec',
   },
 }
 
