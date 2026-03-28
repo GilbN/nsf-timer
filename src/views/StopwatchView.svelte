@@ -3,21 +3,43 @@
   import { t } from '../lib/i18n.js'
   import { TimerEngine } from '../lib/timer/TimerEngine.js'
   import SettingsMenu from '../components/SettingsMenu.svelte'
+  import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
+  import { beepStop } from '../lib/audio.js'
 
   let engine = new TimerEngine()
   let running = $state(false)
   let elapsed = $state(0)
+  let inputMin = $state(0)   // 0–99
+  let inputSec = $state(0)   // 0–59
+  let editing  = $state(false)
+
+  function changeMin(delta) {
+    inputMin = Math.min(99, Math.max(0, inputMin + delta))
+  }
+
+  function changeSec(delta) {
+    inputSec = Math.min(59, Math.max(0, inputSec + delta))
+  }
 
   function toggle() {
     if (!running) {
+      editing = false
       if (elapsed === 0) {
         engine.startCountup((ms) => {
           elapsed = ms
-          timerState.update((s) => ({
-            ...s,
-            phase: 'shooting',
-            remainingMs: ms,
-          }))
+          if (isCountdown && ms >= targetMs) {
+            elapsed = targetMs
+            engine.stop()
+            running = false
+            beepStop()
+            timerState.update((s) => ({ ...s, phase: 'idle', remainingMs: 0 }))
+          } else {
+            timerState.update((s) => ({
+              ...s,
+              phase: 'shooting',
+              remainingMs: isCountdown ? Math.max(0, targetMs - ms) : ms,
+            }))
+          }
         })
       } else {
         engine.resume()
@@ -33,11 +55,8 @@
     engine.stop()
     running = false
     elapsed = 0
-    timerState.update((s) => ({
-      ...s,
-      phase: 'idle',
-      remainingMs: 0,
-    }))
+    timerState.update((s) => ({ ...s, phase: 'idle', remainingMs: 0 }))
+    // inputMin and inputSec are intentionally kept so the same countdown can be re-run
   }
 
   function goBack() {
@@ -62,7 +81,30 @@
     }
   }
 
-  let display = $derived(formatMs(elapsed))
+  let targetMs    = $derived(inputMin * 60_000 + inputSec * 1_000)
+  let isCountdown = $derived(targetMs > 0)
+  let displayMs   = $derived(isCountdown ? Math.max(0, targetMs - elapsed) : elapsed)
+  let display     = $derived(formatMs(displayMs))
+
+  $effect(() => {
+    if (running && $preferences.wakeLockEnabled) {
+      acquireWakeLock()
+      return () => releaseWakeLock()
+    }
+  })
+
+  $effect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && running && $preferences.wakeLockEnabled) {
+        acquireWakeLock()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      releaseWakeLock()
+    }
+  })
 </script>
 
 <div class="view stopwatch-view">
@@ -79,17 +121,74 @@
   </div>
 
   <div class="display-area">
-    <div class="time" class:running>
-      {#if $preferences.stopwatchFormat === 'seconds'}
-        <span class="digits">{Math.floor(elapsed / 1000)}</span>
-      {:else}
-        <span class="digits">{display.min}</span>
-        <span class="colon">:</span>
-        <span class="digits">{display.sec}</span>
-        <span class="colon small">.</span>
-        <span class="digits sub">{display.ms}</span>
-      {/if}
-    </div>
+    {#if editing}
+      <div class="editor-wrapper">
+        <div class="editor">
+          <div class="editor-field">
+            <button class="editor-btn" onclick={() => changeMin(1)}>▲</button>
+            <input
+              class="editor-input"
+              type="number"
+              min="0"
+              max="99"
+              bind:value={inputMin}
+              onfocus={(e) => e.target.select()}
+              oninput={(e) => { inputMin = Math.min(99, Math.max(0, parseInt(e.target.value) || 0)) }}
+            />
+            <button class="editor-btn" onclick={() => changeMin(-1)}>▼</button>
+          </div>
+          <span class="editor-colon">:</span>
+          <div class="editor-field">
+            <button class="editor-btn" onclick={() => changeSec(1)}>▲</button>
+            <input
+              class="editor-input"
+              type="number"
+              min="0"
+              max="59"
+              bind:value={inputSec}
+              onfocus={(e) => e.target.select()}
+              oninput={(e) => { inputSec = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) }}
+            />
+            <button class="editor-btn" onclick={() => changeSec(-1)}>▼</button>
+          </div>
+        </div>
+        <div class="editor-labels">
+          <span class="editor-label">{$t('countdownMinLabel')}</span>
+          <span class="editor-label">{$t('countdownSecondsLabel')}</span>
+        </div>
+      </div>
+    {:else if running}
+      <div class="time running">
+        {#if $preferences.stopwatchFormat === 'seconds'}
+          <span class="digits">{Math.floor(displayMs / 1000)}</span>
+            <span class="colon small">.</span>
+            <span class="digits sub">{display.ms}</span>
+        {:else}
+          <span class="digits">{display.min}</span>
+          <span class="colon">:</span>
+          <span class="digits">{display.sec}</span>
+            <span class="colon small">.</span>
+            <span class="digits sub">{display.ms}</span>
+        {/if}
+      </div>
+    {:else}
+      <button class="time-display-btn" onclick={() => { if (elapsed === 0) editing = !editing }}
+        class:editable={elapsed === 0}>
+        <div class="time">
+          {#if $preferences.stopwatchFormat === 'seconds'}
+            <span class="digits">{Math.floor(displayMs / 1000)}</span>
+              <span class="colon small">.</span>
+              <span class="digits sub">{display.ms}</span>
+          {:else}
+            <span class="digits">{display.min}</span>
+            <span class="colon">:</span>
+            <span class="digits">{display.sec}</span>
+              <span class="colon small">.</span>
+              <span class="digits sub">{display.ms}</span>
+          {/if}
+        </div>
+      </button>
+    {/if}
   </div>
 
   <div class="controls">
@@ -167,7 +266,7 @@
 
   .digits {
     font-family: var(--font-mono);
-    font-size: clamp(4.5rem, 18vw, 9rem);
+    font-size: clamp(4.5rem, 20vw, 10rem);
     font-weight: 900;
     line-height: 1;
     letter-spacing: -0.02em;
@@ -250,4 +349,94 @@
   }
 
   .btn-back:hover { opacity: 0.9; }
+
+  /* ── Time display button (tappable when stopped) ── */
+  .time-display-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .time-display-btn:hover .digits { opacity: 0.75; }
+
+  .time-display-btn:not(.editable) { cursor: default; }
+
+  /* ── Segmented countdown editor ── */
+  .editor-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .editor {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .editor-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .editor-input {
+    font-family: var(--font-mono);
+    font-size: clamp(3.5rem, 14vw, 7.5rem);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    width: 3ch;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+
+  .editor-input::-webkit-outer-spin-button,
+  .editor-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .editor-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .editor-btn:hover { color: var(--text-primary); }
+
+  .editor-colon {
+    font-family: var(--font-mono);
+    font-size: clamp(4.5rem, 20vw, 10rem);
+    font-weight: 900;
+    color: var(--text-secondary);
+    align-self: center;
+    margin-bottom: 0.04em;
+  }
+
+  .editor-labels {
+    display: flex;
+    gap: 3.5rem;
+  }
+
+  .editor-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.5;
+  }
 </style>

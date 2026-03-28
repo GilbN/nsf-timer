@@ -111,6 +111,8 @@ const translations = {
     stopwatchFormat: 'Stoppeklokkeformat',
     countdownSeconds: 'Sekunder',
     countdownMinSec: 'Min:Sek',
+    countdownSecondsLabel: 'sek',
+    countdownMinLabel: 'min',
   },
   en: {
     appName: 'OPK Timer',
@@ -221,6 +223,8 @@ const translations = {
     stopwatchFormat: 'Stopwatch format',
     countdownSeconds: 'Seconds',
     countdownMinSec: 'Min:Sec',
+    countdownSecondsLabel: 'sec',
+    countdownMinLabel: 'min',
   },
 }
 
