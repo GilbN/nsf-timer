@@ -22,7 +22,7 @@
     !!window.navigator.standalone
 
   const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
   let showInstallCard = $state(false)
 
@@ -140,6 +140,10 @@
     window.__pwaInstallPrompt = null
   }
 
+  async function shareApp() {
+    await navigator.share({ title: 'OPK Timer', url: window.location.href })
+  }
+
   function openStopwatch() {
     unlockAudio()
     currentView.set('stopwatch')
@@ -234,22 +238,39 @@
 
     {#if showInstallCard}
       <div class="install-card">
-        <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v13M7 11l5 5 5-5"/>
-          <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
-        </svg>
-        <span class="install-text">{$t('installApp')}</span>
         {#if isIos}
-          <span class="install-hint">{$t('installIosHint')}</span>
-        {/if}
-        <div class="install-actions">
-          {#if !isIos}
+          <div class="install-header">
+            <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v13M7 11l5 5 5-5"/>
+              <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
+            </svg>
+            <span class="install-text">{$t('installApp')}</span>
+            <button class="btn-ghost-sm install-close" onclick={() => showInstallCard = false}>✕</button>
+          </div>
+          <div class="install-ios-row">
+            <span class="install-hint">{$t('installIosHint')}</span>
+            <button class="btn-primary btn-install" onclick={shareApp}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+              {$t('shareToInstall')}
+            </button>
+          </div>
+        {:else}
+          <div class="install-header">
+            <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v13M7 11l5 5 5-5"/>
+              <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
+            </svg>
+            <span class="install-text">{$t('installApp')}</span>
             <button class="btn-primary btn-install" onclick={installApp}>
               {$t('installApp')}
             </button>
-          {/if}
-          <button class="btn-ghost-sm" onclick={() => showInstallCard = false}>✕</button>
-        </div>
+            <button class="btn-ghost-sm install-close" onclick={() => showInstallCard = false}>✕</button>
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -555,13 +576,18 @@
 
   .install-card {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.75rem;
+    flex-direction: column;
+    gap: 0.4rem;
     padding: 0.75rem 1rem;
     background: rgba(0, 230, 118, 0.06);
     border: 1px solid rgba(0, 230, 118, 0.2);
     border-radius: var(--radius);
+  }
+
+  .install-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .install-icon {
@@ -578,23 +604,36 @@
     color: var(--text-primary);
   }
 
-  .install-hint {
-    width: 100%;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    padding-left: calc(20px + 0.75rem);
+  .install-close {
+    flex-shrink: 0;
   }
 
-  .install-actions {
+  .install-ios-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    margin-left: auto;
+    gap: 0.75rem;
+    padding-left: calc(20px + 0.5rem);
+  }
+
+  .install-hint {
+    flex: 1;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
   }
 
   .btn-install {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.8rem;
     padding: 0.4rem 0.9rem;
     min-height: unset;
+    flex-shrink: 0;
+  }
+
+  .btn-icon {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
   }
 </style>
