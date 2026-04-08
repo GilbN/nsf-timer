@@ -4,8 +4,9 @@ const PORT = process.env.PORT || 8080
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
 const HEARTBEAT_INTERVAL = 30_000
 const HEARTBEAT_TIMEOUT = 10_000
+const HOST_GRACE_PERIOD = 30_000 // 30s for host to reconnect
 
-// roomCode → { host: WebSocket, clients: Map<peerId, { ws, name, lane }>, lastState: object|null }
+// roomCode → { host: WebSocket|null, clients: Map<peerId, { ws, name, lane }>, lastState: object|null, graceTimer: number|null }
 const rooms = new Map()
 
 let nextPeerId = 1
@@ -43,11 +44,32 @@ function handleCreateRoom(ws, { code }) {
     send(ws, { action: 'ERROR', reason: 'invalid_code' })
     return
   }
-  if (rooms.has(code)) {
+  
+  const existingRoom = rooms.get(code)
+  
+  // Allow reclaim if room exists but host is disconnected (in grace period)
+  if (existingRoom) {
+    if (existingRoom.host === null && existingRoom.graceTimer) {
+      // Host is reclaiming the room
+      clearTimeout(existingRoom.graceTimer)
+      existingRoom.graceTimer = null
+      existingRoom.host = ws
+      ws._roomCode = code
+      ws._role = 'host'
+      send(ws, { action: 'ROOM_CREATED', code })
+      
+      // Notify clients that host is back
+      for (const { ws: clientWs } of existingRoom.clients.values()) {
+        send(clientWs, { action: 'HOST_RECONNECTED' })
+      }
+      console.log(`[room] ${code} host reclaimed`)
+      return
+    }
     send(ws, { action: 'ERROR', reason: 'code_taken' })
     return
   }
-  rooms.set(code, { host: ws, clients: new Map(), lastState: null })
+  
+  rooms.set(code, { host: ws, clients: new Map(), lastState: null, graceTimer: null })
   ws._roomCode = code
   ws._role = 'host'
   send(ws, { action: 'ROOM_CREATED', code })
@@ -70,12 +92,22 @@ function handleJoinRoom(ws, { code, name, lane }) {
   ws._role = 'client'
   ws._peerId = peerId
 
-  // Notify host
-  send(room.host, { action: 'PEER_JOINED', peerId, name: name || '', lane: lane || '' })
+  // Always send join acknowledgement first
+  send(ws, { action: 'JOINED', peerId, code })
+
+  // Notify host (if connected)
+  if (room.host) {
+    send(room.host, { action: 'PEER_JOINED', peerId, name: name || '', lane: lane || '' })
+  }
 
   // Send cached state immediately if available
   if (room.lastState) {
     send(ws, { action: 'CACHED_STATE', message: room.lastState })
+  }
+  
+  // If host is disconnected (in grace period), let client know
+  if (!room.host) {
+    send(ws, { action: 'HOST_DISCONNECTED' })
   }
 
   console.log(`[room] ${code} peer joined: ${peerId} (${name}, lane ${lane})`)
@@ -97,8 +129,10 @@ function handleRelay(ws, { message }) {
       send(clientWs, { action: 'RELAYED', message })
     }
   } else {
-    // Client → forward to host only
-    send(room.host, { action: 'RELAYED', message })
+    // Client → forward to host only (if connected)
+    if (room.host) {
+      send(room.host, { action: 'RELAYED', message })
+    }
   }
 }
 
@@ -121,16 +155,30 @@ function handleClose(ws) {
   const { code, room, role, peerId } = entry
 
   if (role === 'host') {
-    // Broadcast ROOM_CLOSED to all clients
-    const closedMsg = { action: 'RELAYED', message: { type: 'ROOM_CLOSED', payload: {}, ts: Date.now() } }
+    // Start grace period instead of immediately closing
+    room.host = null
+    
+    // Notify clients that host is temporarily disconnected
     for (const { ws: clientWs } of room.clients.values()) {
-      send(clientWs, closedMsg)
+      send(clientWs, { action: 'HOST_DISCONNECTED' })
     }
-    rooms.delete(code)
-    console.log(`[room] closed ${code} (host disconnected)`)
+    
+    console.log(`[room] ${code} host disconnected, grace period started`)
+    
+    room.graceTimer = setTimeout(() => {
+      // Grace period expired — close the room
+      const closedMsg = { action: 'RELAYED', message: { type: 'ROOM_CLOSED', payload: {}, ts: Date.now() } }
+      for (const { ws: clientWs } of room.clients.values()) {
+        send(clientWs, closedMsg)
+      }
+      rooms.delete(code)
+      console.log(`[room] closed ${code} (grace period expired)`)
+    }, HOST_GRACE_PERIOD)
   } else {
     room.clients.delete(peerId)
-    send(room.host, { action: 'PEER_LEFT', peerId })
+    if (room.host) {
+      send(room.host, { action: 'PEER_LEFT', peerId })
+    }
     console.log(`[room] ${code} peer left: ${peerId}`)
   }
 }

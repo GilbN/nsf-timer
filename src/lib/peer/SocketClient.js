@@ -16,6 +16,7 @@ export class SocketClient {
     this._roomClosed = false
     this._reconnectAttempt = 0
     this._reconnectTimer = null
+    this._joined = false
   }
 
   onStatusChange(cb) { this._onStatusChange = cb }
@@ -27,6 +28,7 @@ export class SocketClient {
     this._destroyed = false
     this._roomClosed = false
     this._reconnectAttempt = 0
+    this._joined = false
 
     return this._connect()
   }
@@ -68,34 +70,26 @@ export class SocketClient {
           // Waiting for join confirmation or error
           if (envelope.action === 'ERROR') {
             clearTimeout(timeout)
+            const reason = envelope.reason === 'lane_taken' ? 'laneRejected' : envelope.reason
             if (envelope.reason === 'lane_taken') {
-              this._destroyed = true
               this._emitStatus('laneRejected')
-              reject(new Error('laneRejected'))
-            } else {
-              reject(new Error(envelope.reason))
             }
+            this.destroy()
+            reject(new Error(reason))
             return
           }
-          if (envelope.action === 'CACHED_STATE' || envelope.action === 'PEER_JOINED') {
-            // Server confirms join by sending CACHED_STATE or PEER_JOINED (to host).
-            // We treat the first non-error message as joined.
+          
+          // Server confirms join with JOINED action
+          if (envelope.action === 'JOINED') {
+            clearTimeout(timeout)
+            this._joined = true
+            this._reconnectAttempt = 0
+            roomState.update((s) => ({ ...s, code: this.code, isHost: false }))
+            this._emitStatus('connected')
+            this._attachMessageHandler()
+            resolve(this.code)
+            return
           }
-          // PEER_JOINED goes to host — clients receive CACHED_STATE or just start getting RELAYEDs.
-          // Mark as joined once the socket is open and no ERROR came.
-          // The server sends CACHED_STATE immediately on join (if available); if not,
-          // the first RELAYED confirms we're in. We resolve on first message from server.
-          clearTimeout(timeout)
-          this._joined = true
-          this._reconnectAttempt = 0
-          roomState.update((s) => ({ ...s, code: this.code, isHost: false }))
-          this._emitStatus('connected')
-          resolve(this.code)
-
-          // Still process this message
-          this._dispatchEnvelope(envelope)
-          this._attachMessageHandler()
-          return
         }
       }
 
@@ -138,6 +132,10 @@ export class SocketClient {
   _dispatchEnvelope(envelope) {
     if (envelope.action === 'RELAYED' || envelope.action === 'CACHED_STATE') {
       this._handleMessage(envelope.message)
+    } else if (envelope.action === 'HOST_DISCONNECTED') {
+      this._emitStatus('hostDisconnected')
+    } else if (envelope.action === 'HOST_RECONNECTED') {
+      this._emitStatus('connected')
     }
   }
 
