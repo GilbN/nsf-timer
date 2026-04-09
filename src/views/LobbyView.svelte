@@ -26,7 +26,7 @@
 
     scheduler.loadProgram(programId)
 
-    saveRoomState({ code: $roomState.code, isHost: true, programId })
+    saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo, programId })
     currentView.set('timer')
   }
 
@@ -37,7 +37,7 @@
 
   function disconnect() {
     if (!confirm(get(t)('confirmDisconnect'))) return
-    if ($roomState.code) {
+    if ($roomState.code && !$roomState.isSolo) {
       addRoomToHistory({ code: $roomState.code, isHost: true })
     }
     if (window.__opkHost) {
@@ -51,11 +51,13 @@
 
 <div class="view lobby-view">
   <div class="top-bar">
-    <RoomCode code={$roomState.code} />
-    <div class="top-bar-right">
+    {#if $roomState.isSolo}
+      <div class="solo-badge">{$t('soloMode')}</div>
+    {:else}
+      <RoomCode code={$roomState.code} />
       <ConnectionStatus status="connected" />
-      <SettingsMenu />
-    </div>
+    {/if}
+    <SettingsMenu />
   </div>
 
   {#if $roomState.connectedPeers.length > 0}
@@ -90,10 +92,17 @@
     gap: 0.5rem;
   }
 
-  .top-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  .solo-badge {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    padding: 0.35rem 0.7rem;
+    background: var(--bg-surface);
+    border: 1px solid rgba(0, 230, 118, 0.2);
+    border-radius: var(--radius);
+    text-transform: uppercase;
   }
 
   .peer-pill {

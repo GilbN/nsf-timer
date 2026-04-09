@@ -27,10 +27,27 @@
 
   async function restoreSession() {
     const savedRoom = loadRoomState()
-    if (!savedRoom?.code) return
+    if (!savedRoom?.code && !savedRoom?.isSolo) return
 
     try {
-      if (savedRoom.isHost) {
+      if (savedRoom.isSolo) {
+        // Solo mode: restore without any WebSocket
+        roomState.set({ code: null, isHost: true, isSolo: true, connectedPeers: [] })
+        const savedTimer = loadTimerState()
+        if (savedTimer?.programId || savedRoom.programId) {
+          const scheduler = new TimerScheduler()
+          window.__opkScheduler = scheduler
+          if (savedTimer?.programId) {
+            scheduler.loadProgram(savedTimer.programId)
+            scheduler.restoreState(savedTimer)
+          } else {
+            scheduler.loadProgram(savedRoom.programId)
+          }
+          currentView.set('timer')
+        } else {
+          currentView.set('lobby')
+        }
+      } else if (savedRoom.isHost) {
         // Host reload: reclaim the same room code
         const host = new SocketHost()
         await host.createRoom(savedRoom.code)

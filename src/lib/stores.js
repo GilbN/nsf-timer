@@ -8,6 +8,7 @@ export const roomState = writable({
   code: null,
   isHost: false,
   isSpectator: false,
+  isSolo: false,
   connectedPeers: [],
 })
 
