@@ -18,6 +18,7 @@
   // Capture role at mount time so it's stable even if roomState changes on disconnect
   const initialIsHost = get(roomState).isHost
   const initialIsClient = !initialIsHost && (!!get(roomState).code || !!window.__opkClient)
+  const initialIsSpectator = initialIsClient && (loadRoomState()?.isSpectator === true)
   let isHost = $derived($roomState.isHost || initialIsHost)
   let program = $derived(getProgramById($timerState.programId))
   let stage = $derived(program?.stages[$timerState.stageIndex])
@@ -152,6 +153,7 @@
       addRoomToHistory({
         code: $roomState.code,
         isHost: $roomState.isHost,
+        isSpectator: savedRoom?.isSpectator || false,
         programId: $timerState.programId,
         name: savedRoom?.name,
         lane: savedRoom?.lane,
@@ -183,6 +185,9 @@
     {/if}
     {#if initialIsClient}
       <ConnectionStatus status={connectionStatus} variant="dot" />
+    {/if}
+    {#if initialIsSpectator}
+      <span class="spectator-badge">{$t('spectator')}</span>
     {/if}
     <div class="top-actions">
       <SettingsMenu />
@@ -290,6 +295,18 @@
     gap: 0.4rem;
     align-items: center;
     margin-left: auto;
+  }
+
+  .spectator-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.5rem;
   }
 
   .icon-btn {

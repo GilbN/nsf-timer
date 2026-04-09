@@ -11,6 +11,7 @@ export class SocketClient {
     this.code = null
     this.name = ''
     this.lane = ''
+    this.role = 'client'
     this._onStatusChange = null
     this._destroyed = false
     this._roomClosed = false
@@ -21,10 +22,11 @@ export class SocketClient {
 
   onStatusChange(cb) { this._onStatusChange = cb }
 
-  async joinRoom(code, { name = '', lane = '' } = {}) {
+  async joinRoom(code, { name = '', lane = '', role = 'client' } = {}) {
     this.code = code.toUpperCase()
     this.name = name
     this.lane = lane
+    this.role = role
     this._destroyed = false
     this._roomClosed = false
     this._reconnectAttempt = 0
@@ -59,6 +61,7 @@ export class SocketClient {
           code: this.code,
           name: this.name,
           lane: this.lane,
+          role: this.role,
         }))
       }
 

@@ -76,18 +76,21 @@ function handleCreateRoom(ws, { code }) {
   console.log(`[room] created ${code}`)
 }
 
-function handleJoinRoom(ws, { code, name, lane }) {
+function handleJoinRoom(ws, { code, name, lane, role }) {
   const room = rooms.get(code)
   if (!room) {
     send(ws, { action: 'ERROR', reason: 'room_not_found' })
     return
   }
-  if (lane && isLaneTaken(room, lane)) {
+
+  const isSpectator = role === 'spectator'
+
+  if (!isSpectator && lane && isLaneTaken(room, lane)) {
     send(ws, { action: 'ERROR', reason: 'lane_taken' })
     return
   }
   const peerId = generatePeerId()
-  room.clients.set(peerId, { ws, name: name || '', lane: lane || '' })
+  room.clients.set(peerId, { ws, name: name || '', lane: lane || '', role: isSpectator ? 'spectator' : 'client' })
   ws._roomCode = code
   ws._role = 'client'
   ws._peerId = peerId
@@ -95,8 +98,8 @@ function handleJoinRoom(ws, { code, name, lane }) {
   // Always send join acknowledgement first
   send(ws, { action: 'JOINED', peerId, code })
 
-  // Notify host (if connected)
-  if (room.host) {
+  // Notify host only for shooters (not spectators)
+  if (!isSpectator && room.host) {
     send(room.host, { action: 'PEER_JOINED', peerId, name: name || '', lane: lane || '' })
   }
 
@@ -104,13 +107,13 @@ function handleJoinRoom(ws, { code, name, lane }) {
   if (room.lastState) {
     send(ws, { action: 'CACHED_STATE', message: room.lastState })
   }
-  
+
   // If host is disconnected (in grace period), let client know
   if (!room.host) {
     send(ws, { action: 'HOST_DISCONNECTED' })
   }
 
-  console.log(`[room] ${code} peer joined: ${peerId} (${name}, lane ${lane})`)
+  console.log(`[room] ${code} ${isSpectator ? 'spectator' : 'peer'} joined: ${peerId}${isSpectator ? '' : ` (${name}, lane ${lane})`}`)
 }
 
 function handleRelay(ws, { message }) {
@@ -175,11 +178,13 @@ function handleClose(ws) {
       console.log(`[room] closed ${code} (grace period expired)`)
     }, HOST_GRACE_PERIOD)
   } else {
+    const clientEntry = room.clients.get(peerId)
     room.clients.delete(peerId)
-    if (room.host) {
+    // Only notify host when a shooter (non-spectator) leaves
+    if (room.host && clientEntry?.role !== 'spectator') {
       send(room.host, { action: 'PEER_LEFT', peerId })
     }
-    console.log(`[room] ${code} peer left: ${peerId}`)
+    console.log(`[room] ${code} ${clientEntry?.role === 'spectator' ? 'spectator' : 'peer'} left: ${peerId}`)
   }
 }
 

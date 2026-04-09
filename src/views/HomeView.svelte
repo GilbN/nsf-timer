@@ -13,6 +13,7 @@
   let joinCode = $state('')
   let joinName = $state('')
   let joinLane = $state('')
+  let joinAsSpectator = $state(false)
   let error = $state('')
   let connecting = $state(false)
   let recentRooms = $state(loadRoomHistory())
@@ -48,13 +49,15 @@
       error = 'Enter a 4-character room code'
       return
     }
-    if (!joinName.trim()) {
-      error = $t('nameRequired')
-      return
-    }
-    if (!joinLane.trim()) {
-      error = $t('laneRequired')
-      return
+    if (!joinAsSpectator) {
+      if (!joinName.trim()) {
+        error = $t('nameRequired')
+        return
+      }
+      if (!joinLane.trim()) {
+        error = $t('laneRequired')
+        return
+      }
     }
     unlockAudio()
     error = ''
@@ -62,8 +65,11 @@
     try {
       const client = new SocketClient()
       window.__opkClient = client
-      const code = await client.joinRoom(joinCode.trim(), { name: joinName.trim(), lane: joinLane.trim() })
-      saveRoomState({ code, isHost: false, name: joinName.trim(), lane: joinLane.trim() })
+      const role = joinAsSpectator ? 'spectator' : 'client'
+      const name = joinAsSpectator ? '' : joinName.trim()
+      const lane = joinAsSpectator ? '' : joinLane.trim()
+      const code = await client.joinRoom(joinCode.trim(), { name, lane, role })
+      saveRoomState({ code, isHost: false, name, lane, isSpectator: joinAsSpectator })
       currentView.set('timer')
     } catch (e) {
       if (e.message === 'laneRejected') {
@@ -99,8 +105,9 @@
       } else {
         const client = new SocketClient()
         window.__opkClient = client
-        await client.joinRoom(room.code, { name: room.name || '', lane: room.lane || '' })
-        saveRoomState({ code: room.code, isHost: false, name: room.name, lane: room.lane })
+        const role = room.isSpectator ? 'spectator' : 'client'
+        await client.joinRoom(room.code, { name: room.name || '', lane: room.lane || '', role })
+        saveRoomState({ code: room.code, isHost: false, name: room.name, lane: room.lane, isSpectator: room.isSpectator || false })
         currentView.set('timer')
       }
     } catch (e) {
@@ -203,24 +210,30 @@
           {$t('join')}
         </button>
       </div>
-      <div class="join-details">
-        <input
-          type="text"
-          bind:value={joinName}
-          placeholder={$t('yourName')}
-          class="join-detail-input"
-          autocomplete="name"
-        />
-        <input
-          type="text"
-          bind:value={joinLane}
-          placeholder={$t('laneNumber')}
-          maxlength="3"
-          class="join-detail-input lane-input"
-          inputmode="numeric"
-          autocomplete="off"
-        />
-      </div>
+      {#if !joinAsSpectator}
+        <div class="join-details">
+          <input
+            type="text"
+            bind:value={joinName}
+            placeholder={$t('yourName')}
+            class="join-detail-input"
+            autocomplete="name"
+          />
+          <input
+            type="text"
+            bind:value={joinLane}
+            placeholder={$t('laneNumber')}
+            maxlength="3"
+            class="join-detail-input lane-input"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </div>
+      {/if}
+      <label class="spectator-toggle">
+        <input type="checkbox" bind:checked={joinAsSpectator} class="spectator-checkbox" />
+        <span class="spectator-toggle-label">{$t('joinAsSpectator')}</span>
+      </label>
     </div>
 
     <button class="btn-ghost stopwatch-btn" onclick={openStopwatch}>
@@ -281,7 +294,7 @@
           <button class="recent-room-card" onclick={() => rejoinRoom(room)} disabled={connecting}>
             <span class="recent-code">{room.code}</span>
             <span class="recent-meta">
-              {room.isHost ? $t('host') : $t('client')}
+              {room.isHost ? $t('host') : room.isSpectator ? $t('spectator') : $t('client')}
               {#if room.joinedAt}· {timeAgo(room.joinedAt)}{/if}
             </span>
           </button>
@@ -435,6 +448,33 @@
     text-align: center;
     font-family: var(--font-mono);
     font-weight: 700;
+  }
+
+  .spectator-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.3rem 0.1rem;
+    user-select: none;
+  }
+
+  .spectator-checkbox {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .spectator-toggle-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .spectator-toggle:hover .spectator-toggle-label {
+    color: var(--text-primary);
   }
 
   .btn-ghost {

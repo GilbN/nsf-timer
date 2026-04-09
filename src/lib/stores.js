@@ -7,6 +7,7 @@ export const currentView = writable('home') // 'home' | 'lobby' | 'timer' | 'sto
 export const roomState = writable({
   code: null,
   isHost: false,
+  isSpectator: false,
   connectedPeers: [],
 })
 

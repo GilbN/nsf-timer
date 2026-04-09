@@ -59,10 +59,11 @@
           currentView.set('lobby')
         }
       } else {
-        // Client reload: reconnect to the same room
+        // Client/spectator reload: reconnect to the same room
         const client = new SocketClient()
         window.__opkClient = client
-        await client.joinRoom(savedRoom.code, { name: savedRoom.name || '', lane: savedRoom.lane || '' })
+        const role = savedRoom.isSpectator ? 'spectator' : 'client'
+        await client.joinRoom(savedRoom.code, { name: savedRoom.name || '', lane: savedRoom.lane || '', role })
         currentView.set('timer')
       }
     } catch {
