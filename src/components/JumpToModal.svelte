@@ -8,6 +8,15 @@
   let selectedExerciseIdx = $state($timerState.exerciseIndex)
   let selectedSeriesIdx = $state($timerState.seriesIndex)
 
+  function stageSummary(stage) {
+    const exs = stage.exercises
+    const totalSeries = exs.reduce((s, e) => s + e.seriesCount, 0)
+    const shots = exs[0].shotsPerSeries
+    const times = [...new Set(exs.map(e => e.timePerSeries ?? e.targetVisibleTime))]
+    const timeStr = times.length === 1 ? `${times[0]}s` : `${Math.min(...times)}–${Math.max(...times)}s`
+    return `${totalSeries} × ${shots} — ${timeStr}`
+  }
+
   let selectedStage = $derived(program.stages[selectedStageIdx])
   let selectedExercise = $derived(selectedStage?.exercises[selectedExerciseIdx])
   let showExercisePicker = $derived((selectedStage?.exercises.length ?? 0) > 1)
@@ -42,15 +51,16 @@
     <!-- Stage selector -->
     <div class="field">
       <span class="field-label">{$t('stage')}</span>
-      <div class="option-grid">
+      <div class="option-grid stage-grid">
         {#each program.stages as stage, i}
           <button
-            class="option-btn"
+            class="option-btn stage-btn"
             class:selected={selectedStageIdx === i}
             class:trial-stage={stage.isTrialStage}
             onclick={() => selectStage(i)}
           >
-            {getLocalizedName(stage.name, $preferences.lang)}
+            <span class="stage-name">{getLocalizedName(stage.name, $preferences.lang)}</span>
+            <span class="stage-detail">{stageSummary(stage)}</span>
           </button>
         {/each}
       </div>
@@ -60,14 +70,15 @@
     {#if showExercisePicker && selectedStage}
       <div class="field">
         <span class="field-label">{$t('exercise')}</span>
-        <div class="option-grid">
-          {#each selectedStage.exercises as _, i}
+        <div class="option-grid exercise-grid">
+          {#each selectedStage.exercises as ex, i}
             <button
-              class="option-btn"
+              class="option-btn exercise-btn"
               class:selected={selectedExerciseIdx === i}
               onclick={() => selectExercise(i)}
             >
-              {i + 1}
+              <span class="ex-number">{$t('exercise')} {i + 1}</span>
+              <span class="ex-detail">{ex.seriesCount} × {ex.shotsPerSeries} &mdash; {ex.timePerSeries ?? ex.targetVisibleTime}s</span>
             </button>
           {/each}
         </div>
@@ -161,6 +172,58 @@
     color: var(--text-secondary);
     transition: background 0.1s, color 0.1s, border-color 0.1s;
     min-width: 2.5rem;
+  }
+
+  .stage-grid {
+    flex-direction: column;
+  }
+
+  .stage-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+  }
+
+  .stage-name {
+    font-weight: 600;
+  }
+
+  .stage-detail {
+    font-size: 0.72rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-btn.selected .stage-detail {
+    opacity: 0.85;
+  }
+
+  .exercise-grid {
+    flex-direction: column;
+  }
+
+  .exercise-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+  }
+
+  .ex-number {
+    font-weight: 600;
+  }
+
+  .ex-detail {
+    font-size: 0.72rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .exercise-btn.selected .ex-detail {
+    opacity: 0.85;
   }
 
   .option-btn:hover {
