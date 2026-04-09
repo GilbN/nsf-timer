@@ -1,0 +1,22 @@
+{
+  "name": "OPK Timer",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [5173, 8080],
+  "portsAttributes": {
+    "5173": { "label": "Vite Dev Server" },
+    "8080": { "label": "WebSocket Relay" }
+  },
+  "postCreateCommand": "npm install && cd server && npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "svelte.svelte-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
