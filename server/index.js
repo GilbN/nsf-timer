@@ -32,6 +32,7 @@ function getRoomForClient(ws) {
 
 function isLaneTaken(room, lane) {
   for (const client of room.clients.values()) {
+    if (client.isSpectator) continue
     if (client.lane === lane) return true
   }
   return false
@@ -83,12 +84,14 @@ function handleJoinRoom(ws, { code, name, lane, role }) {
     return
   }
   const isSpectator = role === 'spectator'
-  if (!isSpectator && lane && isLaneTaken(room, lane)) {
+  // Spectators don't occupy a lane — ignore any lane they send
+  const effectiveLane = isSpectator ? '' : (lane || '')
+  if (!isSpectator && effectiveLane && isLaneTaken(room, effectiveLane)) {
     send(ws, { action: 'ERROR', reason: 'lane_taken' })
     return
   }
   const peerId = generatePeerId()
-  room.clients.set(peerId, { ws, name: name || '', lane: lane || '', isSpectator })
+  room.clients.set(peerId, { ws, name: name || '', lane: effectiveLane, isSpectator })
   ws._roomCode = code
   ws._role = 'client'
   ws._isSpectator = isSpectator
@@ -131,6 +134,8 @@ function handleRelay(ws, { message }) {
       send(clientWs, { action: 'RELAYED', message })
     }
   } else {
+    // Spectators are read-only — drop any traffic they try to send upstream
+    if (ws._isSpectator) return
     // Client → forward to host only (if connected)
     if (room.host) {
       send(room.host, { action: 'RELAYED', message })

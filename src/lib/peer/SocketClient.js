@@ -223,6 +223,6 @@ export class SocketClient {
       try { this.ws.close() } catch {}
       this.ws = null
     }
-    roomState.set({ code: null, isHost: false, connectedPeers: [] })
+    roomState.set({ code: null, isHost: false, isSpectator: false, connectedPeers: [] })
   }
 }

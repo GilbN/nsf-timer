@@ -73,6 +73,7 @@
       } else {
         error = e.message || 'Failed to join room'
       }
+      try { window.__opkClient?.destroy() } catch {}
       window.__opkClient = null
     } finally {
       connecting = false
@@ -113,6 +114,8 @@
       }
     } catch (e) {
       error = e.message || 'Failed to rejoin room'
+      try { window.__opkHost?.destroy() } catch {}
+      try { window.__opkClient?.destroy() } catch {}
       window.__opkHost = null
       window.__opkClient = null
     } finally {
@@ -137,6 +140,7 @@
       currentView.set('display')
     } catch (e) {
       error = e.message || 'Failed to join room'
+      try { client.destroy() } catch {}
       window.__opkClient = null
     } finally {
       connecting = false
