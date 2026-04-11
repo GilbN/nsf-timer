@@ -116,8 +116,8 @@ const translations = {
     countdownSecondsLabel: 'sek',
     countdownMinLabel: 'min',
     spectator: 'Tilskuer',
-    displayScreen: 'Vis på skjerm',
-    watchDisplay: 'Skjermvisning',
+    spectatorScreen: 'Tilskuermodus',
+    watchDisplay: 'Vis',
     watchDisplayHint: 'Stor skjermvisning for monitor/nettbrett uten kontroller',
   },
   en: {
@@ -234,8 +234,8 @@ const translations = {
     countdownSecondsLabel: 'sec',
     countdownMinLabel: 'min',
     spectator: 'Spectator',
-    displayScreen: 'Display Screen',
-    watchDisplay: 'Display Mode',
+    spectatorScreen: 'Spectator mode',
+    watchDisplay: 'Display',
     watchDisplayHint: 'Large-screen view for monitors/tablets — no controls',
   },
 }
