@@ -1,12 +1,13 @@
 import { writable, derived } from 'svelte/store'
 
 // View routing
-export const currentView = writable('home') // 'home' | 'lobby' | 'timer' | 'stopwatch'
+export const currentView = writable('home') // 'home' | 'lobby' | 'timer' | 'stopwatch' | 'display'
 
 // Room state
 export const roomState = writable({
   code: null,
   isHost: false,
+  isSpectator: false,
   connectedPeers: [],
 })
 

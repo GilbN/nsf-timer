@@ -5,15 +5,17 @@
 </script>
 
 {#if variant === 'dot'}
-  <span class="dot" class:reconnecting={status === 'reconnecting' || status === 'hostDisconnected'} class:disconnected={status === 'disconnected'}></span>
-{:else if variant === 'banner' && (status === 'reconnecting' || status === 'disconnected' || status === 'hostDisconnected')}
-  <div class="status-banner" class:reconnecting={status === 'reconnecting' || status === 'hostDisconnected'} class:disconnected={status === 'disconnected'}>
+  <span class="dot" class:reconnecting={status === 'reconnecting' || status === 'hostDisconnected'} class:disconnected={status === 'disconnected' || status === 'roomClosed'}></span>
+{:else if variant === 'banner' && (status === 'reconnecting' || status === 'disconnected' || status === 'hostDisconnected' || status === 'roomClosed')}
+  <div class="status-banner" class:reconnecting={status === 'reconnecting' || status === 'hostDisconnected'} class:disconnected={status === 'disconnected' || status === 'roomClosed'}>
     <span class="banner-dot"></span>
     <span class="banner-label">
       {#if status === 'hostDisconnected'}
         {$t('hostDisconnected')}…
       {:else if status === 'reconnecting'}
         {$t('reconnecting')}…
+      {:else if status === 'roomClosed'}
+        {$t('roomClosed')}
       {:else}
         {$t('disconnected')}
       {/if}

@@ -16,6 +16,8 @@
   let error = $state('')
   let connecting = $state(false)
   let recentRooms = $state(loadRoomHistory())
+  let showDisplayForm = $state(false)
+  let displayCode = $state('')
 
   const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
@@ -71,6 +73,7 @@
       } else {
         error = e.message || 'Failed to join room'
       }
+      try { window.__opkClient?.destroy() } catch {}
       window.__opkClient = null
     } finally {
       connecting = false
@@ -96,6 +99,12 @@
           })
         }
         currentView.set(room.programId ? 'timer' : 'lobby')
+      } else if (room.isSpectator) {
+        const client = new SocketClient()
+        window.__opkClient = client
+        await client.joinRoom(room.code, { role: 'spectator' })
+        saveRoomState({ code: room.code, isHost: false, isSpectator: true })
+        currentView.set('display')
       } else {
         const client = new SocketClient()
         window.__opkClient = client
@@ -105,7 +114,33 @@
       }
     } catch (e) {
       error = e.message || 'Failed to rejoin room'
+      try { window.__opkHost?.destroy() } catch {}
+      try { window.__opkClient?.destroy() } catch {}
       window.__opkHost = null
+      window.__opkClient = null
+    } finally {
+      connecting = false
+    }
+  }
+
+  async function joinDisplay() {
+    const code = displayCode.trim().toUpperCase()
+    if (!code || code.length < 4) {
+      error = 'Enter a 4-character room code'
+      return
+    }
+    unlockAudio()
+    error = ''
+    connecting = true
+    try {
+      const client = new SocketClient()
+      window.__opkClient = client
+      await client.joinRoom(code, { role: 'spectator' })
+      saveRoomState({ code, isHost: false, isSpectator: true })
+      currentView.set('display')
+    } catch (e) {
+      error = e.message || 'Failed to join room'
+      try { client.destroy() } catch {}
       window.__opkClient = null
     } finally {
       connecting = false
@@ -232,6 +267,35 @@
       {$t('stopwatch')}
     </button>
 
+    <button class="btn-ghost display-btn" onclick={() => { showDisplayForm = !showDisplayForm; error = '' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      {$t('spectatorScreen')}
+    </button>
+
+    {#if showDisplayForm}
+      <div class="display-form">
+        <div class="display-hint">{$t('watchDisplayHint')}</div>
+        <div class="join-row">
+          <input
+            type="text"
+            bind:value={displayCode}
+            placeholder={$t('enterCode')}
+            maxlength="4"
+            class="join-input"
+            onkeydown={(e) => e.key === 'Enter' && joinDisplay()}
+            style="text-transform: uppercase"
+          />
+          <button class="btn-secondary btn-large" onclick={joinDisplay} disabled={connecting}>
+            {$t('watchDisplay')}
+          </button>
+        </div>
+      </div>
+    {/if}
+
     {#if showInstallCard}
       <div class="install-card">
         {#if isIos}
@@ -281,7 +345,7 @@
           <button class="recent-room-card" onclick={() => rejoinRoom(room)} disabled={connecting}>
             <span class="recent-code">{room.code}</span>
             <span class="recent-meta">
-              {room.isHost ? $t('host') : $t('client')}
+              {room.isHost ? $t('host') : room.isSpectator ? $t('spectator') : $t('client')}
               {#if room.joinedAt}· {timeAgo(room.joinedAt)}{/if}
             </span>
           </button>
@@ -304,11 +368,16 @@
 
 <style>
   .home-view {
-    justify-content: center;
     gap: 1.25rem;
     overflow-y: auto;
     overflow-x: hidden;
   }
+
+  /* Center content vertically when it fits, but allow scrolling to the top
+     when it doesn't. justify-content: center would clip overflow above the
+     viewport; auto margins collapse to 0 once the container overflows. */
+  .home-view > :first-child { margin-top: auto; }
+  .home-view > :last-child  { margin-bottom: auto; }
 
   /* ── Header ── */
   .header {
@@ -639,5 +708,32 @@
     width: 1em;
     height: 1em;
     flex-shrink: 0;
+  }
+
+  /* ── Display screen ── */
+  .display-btn {
+    border-color: rgba(91, 141, 217, 0.2);
+    color: var(--phase-paused);
+  }
+
+  .display-btn:hover {
+    color: var(--phase-paused);
+    border-color: rgba(91, 141, 217, 0.4);
+  }
+
+  .display-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: rgba(91, 141, 217, 0.05);
+    border: 1px solid rgba(91, 141, 217, 0.15);
+    border-radius: var(--radius);
+  }
+
+  .display-hint {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.01em;
   }
 </style>

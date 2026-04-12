@@ -120,6 +120,17 @@ export class SocketHost {
     switch (envelope.action) {
       case 'PEER_JOINED': {
         const { peerId, name, lane } = envelope
+        // Evict any stale entry that occupies the same lane — the server
+        // enforces lane uniqueness, so any prior match must come from a
+        // stale connection whose PEER_LEFT was missed (e.g. dropped while
+        // the host was reconnecting to the relay).
+        if (lane) {
+          for (const [existingId, entry] of this.connections) {
+            if (existingId !== peerId && entry.lane === lane) {
+              this.connections.delete(existingId)
+            }
+          }
+        }
         this.connections.set(peerId, {
           name: name || '',
           lane: lane || '',
@@ -133,6 +144,30 @@ export class SocketHost {
       }
       case 'PEER_LEFT': {
         this.connections.delete(envelope.peerId)
+        this._syncRoomState()
+        break
+      }
+      case 'PEERS_SNAPSHOT': {
+        // Server sent a fresh peer list (typically on host reclaim after a
+        // relay reconnect). Rebuild connections to match, preserving
+        // existing jam state for peerIds that are still present.
+        const snapshotIds = new Set()
+        for (const p of envelope.peers || []) {
+          snapshotIds.add(p.peerId)
+          if (!this.connections.has(p.peerId)) {
+            this.connections.set(p.peerId, {
+              name: p.name || '',
+              lane: p.lane || '',
+              jamsUsed: 0,
+              jamStageKeys: new Set(),
+            })
+          }
+        }
+        for (const existingId of [...this.connections.keys()]) {
+          if (!snapshotIds.has(existingId)) {
+            this.connections.delete(existingId)
+          }
+        }
         this._syncRoomState()
         break
       }
@@ -286,7 +321,9 @@ export class SocketHost {
       clearTimeout(this._reconnectTimer)
       this._reconnectTimer = null
     }
-    this.broadcast(MSG.ROOM_CLOSED)
+    // Ask the server to close the room — it will notify all clients and
+    // delete the room entry, preventing a spurious 30-minute grace period.
+    this._sendEnvelope({ action: 'CLOSE_ROOM' })
     if (this.ws) {
       try { this.ws.close() } catch {}
       this.ws = null

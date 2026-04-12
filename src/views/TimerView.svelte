@@ -69,7 +69,7 @@
         } else if (status === 'reconnecting') {
           connectionStatus = 'reconnecting'
         } else if (status === 'roomClosed') {
-          connectionStatus = 'disconnected'
+          connectionStatus = 'roomClosed'
         } else {
           connectionStatus = 'disconnected'
         }
@@ -405,5 +405,16 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     opacity: 0.3;
+  }
+
+  /* ── Landscape on mobile: compress vertical spacing ── */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .timer-view { gap: 0.2rem; }
+    .top-bar    { min-height: 32px; }
+    .timer-area { min-height: 80px; }
+    .client-hint { padding: 0.25rem; font-size: 0.75rem; }
+    .bottom-actions { padding: 0.1rem 0; }
+    .stage-complete-banner,
+    .reshoot-banner { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
   }
 </style>

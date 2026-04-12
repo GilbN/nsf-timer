@@ -211,6 +211,15 @@
     animation: glow-green 2s ease-in-out infinite;
   }
 
+  /* ── Landscape: height is the constraint on mobile ── */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .digits        { font-size: clamp(3rem, 18vh, 10rem); }
+    .digits.super  { font-size: clamp(4rem, 26vh, 15rem); }
+    .colon         { font-size: clamp(2.5rem, 14vh, 8.5rem); }
+    .timer-display { gap: 0.35rem; }
+    .phase-banner  { padding: 0 0.75rem; }
+  }
+
   /* ── Trial indicator ── */
   .trial-indicator {
     display: flex;

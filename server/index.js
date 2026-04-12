@@ -4,7 +4,7 @@ const PORT = process.env.PORT || 8080
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
 const HEARTBEAT_INTERVAL = 30_000
 const HEARTBEAT_TIMEOUT = 10_000
-const HOST_GRACE_PERIOD = 30_000 // 30s for host to reconnect
+const HOST_GRACE_PERIOD = 60_000 * 30 // 10 minutes for host to reconnect
 
 // roomCode → { host: WebSocket|null, clients: Map<peerId, { ws, name, lane }>, lastState: object|null, graceTimer: number|null }
 const rooms = new Map()
@@ -32,6 +32,7 @@ function getRoomForClient(ws) {
 
 function isLaneTaken(room, lane) {
   for (const client of room.clients.values()) {
+    if (client.isSpectator) continue
     if (client.lane === lane) return true
   }
   return false
@@ -57,12 +58,24 @@ function handleCreateRoom(ws, { code }) {
       ws._roomCode = code
       ws._role = 'host'
       send(ws, { action: 'ROOM_CREATED', code })
-      
+
+      // Send a snapshot of current non-spectator peers so the host can
+      // rebuild its connections map. Any PEER_JOINED / PEER_LEFT messages
+      // emitted while the host was offline were silently dropped, so
+      // without this the host's view of the lobby can drift from ground
+      // truth (missing peers, duplicated peers after later rejoins, etc).
+      const peers = []
+      for (const [peerId, client] of existingRoom.clients) {
+        if (client.isSpectator) continue
+        peers.push({ peerId, name: client.name, lane: client.lane })
+      }
+      send(ws, { action: 'PEERS_SNAPSHOT', peers })
+
       // Notify clients that host is back
       for (const { ws: clientWs } of existingRoom.clients.values()) {
         send(clientWs, { action: 'HOST_RECONNECTED' })
       }
-      console.log(`[room] ${code} host reclaimed`)
+      console.log(`[room] ${code} host reclaimed (${peers.length} peer${peers.length === 1 ? '' : 's'})`)
       return
     }
     send(ws, { action: 'ERROR', reason: 'code_taken' })
@@ -76,27 +89,31 @@ function handleCreateRoom(ws, { code }) {
   console.log(`[room] created ${code}`)
 }
 
-function handleJoinRoom(ws, { code, name, lane }) {
+function handleJoinRoom(ws, { code, name, lane, role }) {
   const room = rooms.get(code)
   if (!room) {
     send(ws, { action: 'ERROR', reason: 'room_not_found' })
     return
   }
-  if (lane && isLaneTaken(room, lane)) {
+  const isSpectator = role === 'spectator'
+  // Spectators don't occupy a lane — ignore any lane they send
+  const effectiveLane = isSpectator ? '' : (lane || '')
+  if (!isSpectator && effectiveLane && isLaneTaken(room, effectiveLane)) {
     send(ws, { action: 'ERROR', reason: 'lane_taken' })
     return
   }
   const peerId = generatePeerId()
-  room.clients.set(peerId, { ws, name: name || '', lane: lane || '' })
+  room.clients.set(peerId, { ws, name: name || '', lane: effectiveLane, isSpectator })
   ws._roomCode = code
   ws._role = 'client'
+  ws._isSpectator = isSpectator
   ws._peerId = peerId
 
   // Always send join acknowledgement first
   send(ws, { action: 'JOINED', peerId, code })
 
-  // Notify host (if connected)
-  if (room.host) {
+  // Notify host for non-spectators only (spectators are invisible to host)
+  if (!isSpectator && room.host) {
     send(room.host, { action: 'PEER_JOINED', peerId, name: name || '', lane: lane || '' })
   }
 
@@ -129,6 +146,8 @@ function handleRelay(ws, { message }) {
       send(clientWs, { action: 'RELAYED', message })
     }
   } else {
+    // Spectators are read-only — drop any traffic they try to send upstream
+    if (ws._isSpectator) return
     // Client → forward to host only (if connected)
     if (room.host) {
       send(room.host, { action: 'RELAYED', message })
@@ -144,6 +163,32 @@ function handleRelayTo(ws, { peerId, message }) {
   if (client) {
     send(client.ws, { action: 'RELAYED', message })
   }
+}
+
+function handleCloseRoom(ws) {
+  const entry = getRoomForClient(ws)
+  if (!entry || entry.role !== 'host') return
+
+  const { code, room } = entry
+
+  // Cancel any pending grace timer — the host is telling us explicitly
+  // that the session is over, so we should not wait to clean up.
+  if (room.graceTimer) {
+    clearTimeout(room.graceTimer)
+    room.graceTimer = null
+  }
+
+  // Notify every client that the room has been closed by the host.
+  const closedMsg = {
+    action: 'RELAYED',
+    message: { type: 'ROOM_CLOSED', payload: {}, ts: Date.now() },
+  }
+  for (const { ws: clientWs } of room.clients.values()) {
+    send(clientWs, closedMsg)
+  }
+
+  rooms.delete(code)
+  console.log(`[room] ${code} closed by host`)
 }
 
 // --- Connection lifecycle ---
@@ -176,7 +221,7 @@ function handleClose(ws) {
     }, HOST_GRACE_PERIOD)
   } else {
     room.clients.delete(peerId)
-    if (room.host) {
+    if (room.host && !ws._isSpectator) {
       send(room.host, { action: 'PEER_LEFT', peerId })
     }
     console.log(`[room] ${code} peer left: ${peerId}`)
@@ -225,11 +270,12 @@ wss.on('connection', (ws) => {
     }
 
     switch (msg.action) {
-      case 'CREATE_ROOM': handleCreateRoom(ws, msg); break
-      case 'JOIN_ROOM':   handleJoinRoom(ws, msg);   break
-      case 'RELAY':       handleRelay(ws, msg);       break
-      case 'RELAY_TO':    handleRelayTo(ws, msg);     break
-      case 'PING':        send(ws, { action: 'PONG' }); break
+      case 'CREATE_ROOM':  handleCreateRoom(ws, msg);          break
+      case 'JOIN_ROOM':    handleJoinRoom(ws, msg);             break
+      case 'RELAY':        handleRelay(ws, msg);                break
+      case 'RELAY_TO':     handleRelayTo(ws, msg);              break
+      case 'CLOSE_ROOM':   handleCloseRoom(ws);                 break
+      case 'PING':         send(ws, { action: 'PONG' });        break
     }
   })
 

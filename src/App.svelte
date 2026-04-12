@@ -8,6 +8,7 @@
   import LobbyView from './views/LobbyView.svelte'
   import TimerView from './views/TimerView.svelte'
   import StopwatchView from './views/StopwatchView.svelte'
+  import DisplayView from './views/DisplayView.svelte'
 
   // Restore preferences on load
   const savedPrefs = loadPreferences()
@@ -58,6 +59,12 @@
           // Host was in lobby (no program selected yet)
           currentView.set('lobby')
         }
+      } else if (savedRoom.isSpectator) {
+        // Display/spectator reload: reconnect as spectator
+        const client = new SocketClient()
+        window.__opkClient = client
+        await client.joinRoom(savedRoom.code, { role: 'spectator' })
+        currentView.set('display')
       } else {
         // Client reload: reconnect to the same room
         const client = new SocketClient()
@@ -83,4 +90,6 @@
   <TimerView />
 {:else if $currentView === 'stopwatch'}
   <StopwatchView />
+{:else if $currentView === 'display'}
+  <DisplayView />
 {/if}
