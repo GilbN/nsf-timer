@@ -12,6 +12,7 @@
   import SettingsMenu from '../components/SettingsMenu.svelte'
 
   let showEditor = $state(false)
+  let editingProgram = $state(null)
 
   function selectProgram(programId) {
     const scheduler = new TimerScheduler()
@@ -31,8 +32,17 @@
   }
 
   function handleCustomSave(program) {
+    const wasEditing = editingProgram !== null
     showEditor = false
-    selectProgram(program.id)
+    editingProgram = null
+    if (!wasEditing) {
+      selectProgram(program.id)
+    }
+  }
+
+  function handleEdit(program) {
+    editingProgram = JSON.parse(JSON.stringify(program))
+    showEditor = true
   }
 
   function disconnect() {
@@ -69,9 +79,9 @@
 
   <div class="content">
     {#if showEditor}
-      <ProgramEditor onSave={handleCustomSave} onCancel={() => (showEditor = false)} />
+      <ProgramEditor onSave={handleCustomSave} onCancel={() => { showEditor = false; editingProgram = null }} editProgram={editingProgram} />
     {:else}
-      <ProgramPicker onSelect={selectProgram} onCustom={() => (showEditor = true)} />
+      <ProgramPicker onSelect={selectProgram} onCustom={() => (showEditor = true)} onEdit={handleEdit} />
     {/if}
   </div>
 

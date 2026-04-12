@@ -1,11 +1,11 @@
 <script>
   import { t } from '../lib/i18n.js'
-  import { saveCustomPrograms, loadCustomPrograms } from '../lib/storage.js'
+  import { saveCustomPrograms, loadCustomPrograms, updateCustomProgram } from '../lib/storage.js'
 
-  let { onSave, onCancel } = $props()
+  let { onSave, onCancel, editProgram = null } = $props()
 
-  let name = $state('')
-  let stages = $state([createStage()])
+  let name = $state(editProgram ? editProgram.name.no : '')
+  let stages = $state(editProgram ? JSON.parse(JSON.stringify(editProgram.stages)) : [createStage()])
 
   function createStage() {
     return {
@@ -23,6 +23,15 @@
         shotsPerSeries: 5,
         shotsPerShowing: 1,
         targetVisibleTime: 3,
+        targetHiddenTime: 7,
+        loadingTime: 60,
+      }
+    }
+    if (type === 'rapid') {
+      return {
+        seriesCount: 1,
+        shotsPerSeries: 5,
+        timePerSeries: 10,
         targetHiddenTime: 7,
         loadingTime: 60,
       }
@@ -49,6 +58,12 @@
     stages = [...stages]
   }
 
+  function removeExercise(dsIdx, exIdx) {
+    const ds = stages[dsIdx]
+    ds.exercises = ds.exercises.filter((_, i) => i !== exIdx)
+    stages = [...stages]
+  }
+
   function updateType(dsIdx, type) {
     stages[dsIdx].type = type
     stages[dsIdx].exercises = [createExercise(type)]
@@ -59,7 +74,7 @@
     if (!name.trim()) return
 
     const program = {
-      id: 'custom-' + Date.now(),
+      id: editProgram ? editProgram.id : 'custom-' + Date.now(),
       name: { no: name, en: name },
       distance: '',
       calibers: [],
@@ -67,21 +82,27 @@
       trialShots: 0,
       stages: stages.map((ds, i) => ({
         ...ds,
-        id: `ds${i + 1}`,
-        name: ds.name.no ? ds.name : { no: `Delserie ${i + 1}`, en: `Stage ${i + 1}` },
+        id: ds.id.startsWith('ds-') ? `ds${i + 1}` : ds.id,
+        name: ds.name.no
+          ? { no: ds.name.no, en: ds.name.no }
+          : { no: `Delserie ${i + 1}`, en: `Stage ${i + 1}` },
       })),
     }
 
-    const custom = loadCustomPrograms()
-    custom.push(program)
-    saveCustomPrograms(custom)
+    if (editProgram) {
+      updateCustomProgram(program)
+    } else {
+      const custom = loadCustomPrograms()
+      custom.push(program)
+      saveCustomPrograms(custom)
+    }
 
     if (onSave) onSave(program)
   }
 </script>
 
 <div class="program-editor">
-  <h3>{$t('customProgram')}</h3>
+  <h3>{editProgram ? $t('editProgram') : $t('customProgram')}</h3>
 
   <label>
     <span>{$t('programName')}</span>
@@ -94,6 +115,7 @@
         <input type="text" bind:value={ds.name.no} placeholder={$t('stageName')} />
         <select value={ds.type} onchange={(e) => updateType(dsIdx, e.target.value)}>
           <option value="precision">{$t('precision')}</option>
+          <option value="rapid">{$t('rapid')}</option>
           <option value="duell">{$t('duell')}</option>
         </select>
         {#if stages.length > 1}
@@ -103,6 +125,13 @@
 
       {#each ds.exercises as ex, exIdx}
         <div class="exercise-block">
+          {#if ds.exercises.length > 1}
+            <button
+              class="btn-remove-exercise"
+              onclick={() => removeExercise(dsIdx, exIdx)}
+              title={$t('removeExercise')}
+            >X</button>
+          {/if}
           <div class="field-row">
             <label>
               <span>{$t('seriesCount')}</span>
@@ -123,6 +152,17 @@
               <span>{$t('timePerSeriesSec')}</span>
               <input type="number" bind:value={ex.timePerSeries} min="1" max="600" />
             </label>
+          {:else if ds.type === 'rapid'}
+            <div class="field-row">
+              <label>
+                <span>{$t('timePerSeriesSec')}</span>
+                <input type="number" bind:value={ex.timePerSeries} min="1" max="600" />
+              </label>
+              <label>
+                <span>{$t('targetHiddenSec')}</span>
+                <input type="number" bind:value={ex.targetHiddenTime} min="1" max="30" />
+              </label>
+            </div>
           {:else}
             <div class="field-row">
               <label>
@@ -161,8 +201,6 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    overflow-y: auto;
-    max-height: calc(100vh - 120px);
     padding-bottom: 1rem;
   }
 
@@ -213,12 +251,39 @@
   }
 
   .exercise-block {
+    position: relative;
     padding: 0.5rem;
     background: var(--bg-primary);
     border-radius: var(--radius);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .btn-remove-exercise {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: var(--radius);
+    font-size: 0.65rem;
+    font-weight: 700;
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity 0.15s, border-color 0.15s;
+  }
+
+  .btn-remove-exercise:hover {
+    opacity: 1;
+    border-color: var(--danger);
   }
 
   .field-row {

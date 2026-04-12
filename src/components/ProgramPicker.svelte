@@ -1,10 +1,11 @@
 <script>
+  import { get } from 'svelte/store'
   import { preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getAllPrograms } from '../lib/programs/registry.js'
-  import { loadCustomPrograms } from '../lib/storage.js'
+  import { loadCustomPrograms, deleteCustomProgram } from '../lib/storage.js'
 
-  let { onSelect, onCustom } = $props()
+  let { onSelect, onCustom, onEdit } = $props()
 
   let builtinPrograms = getAllPrograms()
   let customPrograms = $state(loadCustomPrograms())
@@ -14,6 +15,18 @@
   function toggleInfo(e, id) {
     e.stopPropagation()
     expandedId = expandedId === id ? null : id
+  }
+
+  function handleEdit(e, program) {
+    e.stopPropagation()
+    if (onEdit) onEdit(program)
+  }
+
+  function handleDelete(e, program) {
+    e.stopPropagation()
+    if (!confirm(get(t)('confirmDeleteProgram'))) return
+    deleteCustomProgram(program.id)
+    customPrograms = loadCustomPrograms()
   }
 </script>
 
@@ -89,6 +102,26 @@
           <button class="program-select" onclick={() => onSelect(program.id)}>
             <span class="program-name">{getLocalizedName(program.name, lang)}</span>
             <span class="program-meta">{$t('customProgram')}</span>
+          </button>
+          <button
+            class="action-btn"
+            onclick={(e) => handleEdit(e, program)}
+            aria-label={$t('editProgram')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button
+            class="action-btn action-btn-danger"
+            onclick={(e) => handleDelete(e, program)}
+            aria-label={$t('deleteProgram')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -253,6 +286,36 @@
     left: 0;
     color: var(--accent);
     font-size: 0.65rem;
+  }
+
+  .action-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .action-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .action-btn:hover {
+    opacity: 1;
+    color: var(--accent);
+  }
+
+  .action-btn-danger:hover {
+    color: var(--danger);
   }
 
   .add-custom {

@@ -6,13 +6,14 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const wsPort = env.WS_PORT || '8080'
   return {
   base: env.VITE_BASE_PATH || '/',
   server: command === 'serve' ? {
     https: env.VITE_HTTPS === 'true',
     host: true,
     proxy: {
-      '/ws': { target: 'ws://localhost:8080', ws: true },
+      '/ws': { target: `ws://localhost:${wsPort}`, ws: true },
     },
   } : undefined,
   plugins: [
