@@ -25,7 +25,7 @@
 
   // Client connection status
   $effect(() => {
-    const client = window.__opkClient
+    const client = window.__nsfClient
     if (client) {
       client.onStatusChange((status) => {
         if (status === 'connected') connectionStatus = 'connected'
@@ -60,9 +60,9 @@
         lane: savedRoom?.lane,
       })
     }
-    if (window.__opkClient) {
-      window.__opkClient.destroy()
-      window.__opkClient = null
+    if (window.__nsfClient) {
+      window.__nsfClient.destroy()
+      window.__nsfClient = null
     }
     clearTimerState()
     clearRoomState()

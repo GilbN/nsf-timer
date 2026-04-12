@@ -334,7 +334,7 @@ export function getProgramById(id) {
   if (builtin) return builtin
   // Check custom programs in localStorage
   try {
-    const custom = JSON.parse(localStorage.getItem('opk-timer-custom-programs') || '[]')
+    const custom = JSON.parse(localStorage.getItem('nsf-timer-custom-programs') || '[]')
     return custom.find((p) => p.id === id) || null
   } catch {
     return null

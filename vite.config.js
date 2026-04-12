@@ -23,8 +23,8 @@ export default defineConfig(({ command, mode }) => {
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'OPK Timer',
-        short_name: 'OPK Timer',
+        name: 'NSF Timer',
+        short_name: 'NSF Timer',
         description: 'Synchronized timer for NSF 25m shooting competitions',
         theme_color: '#0d0d1a',
         background_color: '#0d0d1a',

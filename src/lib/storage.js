@@ -1,9 +1,9 @@
 const STORAGE_KEYS = {
-  TIMER_STATE: 'opk-timer-state',
-  PREFERENCES: 'opk-timer-prefs',
-  ROOM: 'opk-timer-room',
-  CUSTOM_PROGRAMS: 'opk-timer-custom-programs',
-  ROOM_HISTORY: 'opk-timer-room-history',
+  TIMER_STATE: 'nsf-timer-state',
+  PREFERENCES: 'nsf-timer-prefs',
+  ROOM: 'nsf-timer-room',
+  CUSTOM_PROGRAMS: 'nsf-timer-custom-programs',
+  ROOM_HISTORY: 'nsf-timer-room-history',
 }
 
 const MAX_ROOM_HISTORY = 10

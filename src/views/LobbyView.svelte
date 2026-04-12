@@ -16,9 +16,9 @@
 
   function selectProgram(programId) {
     const scheduler = new TimerScheduler()
-    window.__opkScheduler = scheduler
+    window.__nsfScheduler = scheduler
 
-    const host = window.__opkHost
+    const host = window.__nsfHost
     if (host) {
       scheduler.onStateChange((state) => {
         host.broadcastState(state)
@@ -50,9 +50,9 @@
     if ($roomState.code && !$roomState.isSolo) {
       addRoomToHistory({ code: $roomState.code, isHost: true })
     }
-    if (window.__opkHost) {
-      window.__opkHost.destroy()
-      window.__opkHost = null
+    if (window.__nsfHost) {
+      window.__nsfHost.destroy()
+      window.__nsfHost = null
     }
     clearRoomState()
     currentView.set('home')

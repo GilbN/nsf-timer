@@ -36,7 +36,7 @@
         const savedTimer = loadTimerState()
         if (savedTimer?.programId || savedRoom.programId) {
           const scheduler = new TimerScheduler()
-          window.__opkScheduler = scheduler
+          window.__nsfScheduler = scheduler
           if (savedTimer?.programId) {
             scheduler.loadProgram(savedTimer.programId)
             scheduler.restoreState(savedTimer)
@@ -51,13 +51,13 @@
         // Host reload: reclaim the same room code
         const host = new SocketHost()
         await host.createRoom(savedRoom.code)
-        window.__opkHost = host
+        window.__nsfHost = host
 
         // Restore timer state if a program was active
         const savedTimer = loadTimerState()
         if (savedTimer?.programId || savedRoom.programId) {
           const scheduler = new TimerScheduler()
-          window.__opkScheduler = scheduler
+          window.__nsfScheduler = scheduler
 
           // Wire up broadcasting before loading so initial state is sent
           scheduler.onStateChange((state) => {
@@ -79,13 +79,13 @@
       } else if (savedRoom.isSpectator) {
         // Display/spectator reload: reconnect as spectator
         const client = new SocketClient()
-        window.__opkClient = client
+        window.__nsfClient = client
         await client.joinRoom(savedRoom.code, { role: 'spectator' })
         currentView.set('display')
       } else {
         // Client reload: reconnect to the same room
         const client = new SocketClient()
-        window.__opkClient = client
+        window.__nsfClient = client
         await client.joinRoom(savedRoom.code, { name: savedRoom.name || '', lane: savedRoom.lane || '' })
         currentView.set('timer')
       }
@@ -93,8 +93,8 @@
       // Reconnection failed — clean up and go home
       clearRoomState()
       clearTimerState()
-      window.__opkHost = null
-      window.__opkClient = null
+      window.__nsfHost = null
+      window.__nsfClient = null
     }
   }
 </script>

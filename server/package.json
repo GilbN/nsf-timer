@@ -1,5 +1,5 @@
 {
-  "name": "opk-timer-server",
+  "name": "nsf-timer-server",
   "private": true,
   "type": "module",
   "scripts": {

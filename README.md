@@ -1,4 +1,4 @@
-# OPK Timer
+# NSF Timer
 
 Synchronized timer for NSF 25m shooting competitions. Built as a Progressive Web App — install it on any phone, tablet, or computer and run competitions across multiple devices via a WebSocket relay server.
 
@@ -26,7 +26,7 @@ Synchronized timer for NSF 25m shooting competitions. Built as a Progressive Web
 The Docker image bundles the Svelte frontend and WebSocket relay server into a single container. Nginx serves the static files and proxies `/ws` to the Node.js relay server internally.
 
 ```bash
-docker run -d -p 80:80 ghcr.io/gilbn/opk-timer:latest
+docker run -d -p 80:80 ghcr.io/gilbn/nsf-timer:latest
 ```
 
 Access the app at `http://<server-ip>/`.
@@ -36,7 +36,7 @@ For internet-facing deployments, restrict WebSocket origins:
 ```bash
 docker run -d -p 80:80 \
   -e WS_ALLOWED_ORIGINS=https://timer.example.com \
-  ghcr.io/gilbn/opk-timer:latest
+  ghcr.io/gilbn/nsf-timer:latest
 ```
 
 For HTTPS, place the container behind a reverse proxy (e.g. Caddy, Traefik, nginx Proxy Manager) that handles TLS termination. The app automatically upgrades to `wss://` when served over HTTPS.
@@ -45,8 +45,8 @@ For HTTPS, place the container behind a reverse proxy (e.g. Caddy, Traefik, ngin
 
 ```yaml
 services:
-  opk-timer:
-    image: ghcr.io/gilbn/opk-timer:latest
+  nsf-timer:
+    image: ghcr.io/gilbn/nsf-timer:latest
     ports:
       - "80:80"
     restart: unless-stopped

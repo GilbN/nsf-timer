@@ -3,8 +3,8 @@ import { preferences } from './stores.js'
 
 const translations = {
   no: {
-    appName: 'OPK Timer',
-    shareRoomPrefix: 'Bli med i OPK Timer-rom:',
+    appName: 'NSF Timer',
+    shareRoomPrefix: 'Bli med i NSF Timer-rom:',
     installApp: 'Installer app',
     installIosHint: 'Trykk på Del-knappen og velg «Legg til på Hjem-skjerm»',
     shareToInstall: 'Del',
@@ -125,10 +125,11 @@ const translations = {
     spectatorScreen: 'Tilskuermodus',
     watchDisplay: 'Vis',
     watchDisplayHint: 'Stor skjermvisning for monitor/nettbrett uten kontroller',
+    tagline: 'NSF 25m Konkurransetimer',
   },
   en: {
-    appName: 'OPK Timer',
-    shareRoomPrefix: 'Join OPK Timer room:',
+    appName: 'NSF Timer',
+    shareRoomPrefix: 'Join NSF Timer room:',
     installApp: 'Install App',
     installIosHint: 'Tap the Share button and select "Add to Home Screen"',
     shareToInstall: 'Share',
@@ -249,6 +250,7 @@ const translations = {
     spectatorScreen: 'Spectator mode',
     watchDisplay: 'Display',
     watchDisplayHint: 'Large-screen view for monitors/tablets — no controls',
+    tagline: 'NSF 25m Competition Timer',
   },
 }
 

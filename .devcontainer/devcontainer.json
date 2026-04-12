@@ -1,5 +1,5 @@
 {
-  "name": "OPK Timer",
+  "name": "NSF Timer",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",

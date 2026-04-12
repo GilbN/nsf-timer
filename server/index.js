@@ -285,4 +285,4 @@ wss.on('connection', (ws) => {
 
 startHeartbeat(wss)
 
-console.log(`opk-timer relay server listening on ws://localhost:${WS_PORT}`)
+console.log(`nsf-timer relay server listening on ws://localhost:${WS_PORT}`)

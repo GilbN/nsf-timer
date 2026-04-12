@@ -39,7 +39,7 @@
   }
 
   function handleConfirm() {
-    window.__opkScheduler?.jumpTo(selectedStageIdx, selectedExerciseIdx, selectedSeriesIdx)
+    window.__nsfScheduler?.jumpTo(selectedStageIdx, selectedExerciseIdx, selectedSeriesIdx)
     onClose()
   }
 </script>

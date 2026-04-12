@@ -17,7 +17,7 @@
 
   // Capture role at mount time so it's stable even if roomState changes on disconnect
   const initialIsHost = get(roomState).isHost
-  const initialIsClient = !initialIsHost && (!!get(roomState).code || !!window.__opkClient)
+  const initialIsClient = !initialIsHost && (!!get(roomState).code || !!window.__nsfClient)
   let isHost = $derived($roomState.isHost || initialIsHost)
   let program = $derived(getProgramById($timerState.programId))
   let stage = $derived(program?.stages[$timerState.stageIndex])
@@ -61,7 +61,7 @@
 
   // Client connection status handling
   $effect(() => {
-    const client = window.__opkClient
+    const client = window.__nsfClient
     if (client) {
       client.onStatusChange((status) => {
         if (status === 'connected') {
@@ -105,24 +105,24 @@
     }
   })
 
-  function handleStart() { window.__opkScheduler?.startSeries() }
-  function handlePause() { window.__opkScheduler?.pause() }
-  function handleResume() { window.__opkScheduler?.resume() }
-  function handleStop() { window.__opkScheduler?.stop() }
-  function handleNext() { window.__opkScheduler?.nextExercise() }
+  function handleStart() { window.__nsfScheduler?.startSeries() }
+  function handlePause() { window.__nsfScheduler?.pause() }
+  function handleResume() { window.__nsfScheduler?.resume() }
+  function handleStop() { window.__nsfScheduler?.stop() }
+  function handleNext() { window.__nsfScheduler?.nextExercise() }
 
   let showJumpModal = $state(false)
 
   function handleReset() {
     if (!confirm(get(t)('confirmReset'))) return
-    window.__opkScheduler?.reset()
-    window.__opkHost?.resetAllJams()
+    window.__nsfScheduler?.reset()
+    window.__nsfHost?.resetAllJams()
     clearTimerState()
   }
 
   function handleReshoot(peer) {
-    const host = window.__opkHost
-    const scheduler = window.__opkScheduler
+    const host = window.__nsfHost
+    const scheduler = window.__nsfScheduler
     if (!host || !scheduler) return
 
     const stageKey = scheduler.getCurrentStageKey()
@@ -135,11 +135,11 @@
 
   function changeProgram() {
     if (!confirm(get(t)('confirmChangeProgram'))) return
-    if (window.__opkScheduler) {
-      window.__opkScheduler.destroy()
-      window.__opkScheduler = null
+    if (window.__nsfScheduler) {
+      window.__nsfScheduler.destroy()
+      window.__nsfScheduler = null
     }
-    window.__opkHost?.resetAllJams()
+    window.__nsfHost?.resetAllJams()
     clearTimerState()
     saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo })
     currentView.set('lobby')
@@ -157,17 +157,17 @@
         lane: savedRoom?.lane,
       })
     }
-    if (window.__opkScheduler) {
-      window.__opkScheduler.destroy()
-      window.__opkScheduler = null
+    if (window.__nsfScheduler) {
+      window.__nsfScheduler.destroy()
+      window.__nsfScheduler = null
     }
-    if (window.__opkHost) {
-      window.__opkHost.destroy()
-      window.__opkHost = null
+    if (window.__nsfHost) {
+      window.__nsfHost.destroy()
+      window.__nsfHost = null
     }
-    if (window.__opkClient) {
-      window.__opkClient.destroy()
-      window.__opkClient = null
+    if (window.__nsfClient) {
+      window.__nsfClient.destroy()
+      window.__nsfClient = null
     }
     clearTimerState()
     clearRoomState()

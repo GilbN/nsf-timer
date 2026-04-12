@@ -20,7 +20,7 @@ No test runner or linter is configured.
 
 ## Architecture Overview
 
-OPK Timer is a **Svelte 5 + Vite PWA** for running synchronized NSF 25m shooting competition timers across multiple devices via a WebSocket relay server.
+NSF Timer is a **Svelte 5 + Vite PWA** for running synchronized NSF 25m shooting competition timers across multiple devices via a WebSocket relay server.
 
 ### Host/Client model
 
@@ -31,7 +31,7 @@ The app uses a strict host/client topology:
 - Room codes avoid ambiguous characters (no O, 0, I, 1, L).
 - The relay server (`server/index.js`) is stateless except for an in-memory room registry and a cached last `STATE_SYNC` per room for fast reconnection.
 
-Global singletons `window.__opkHost` (SocketHost), `window.__opkClient` (SocketClient), and `window.__opkScheduler` (TimerScheduler) hold the active connection/scheduler. These are set in `App.svelte` during session creation or restore.
+Global singletons `window.__nsfHost` (SocketHost), `window.__nsfClient` (SocketClient), and `window.__nsfScheduler` (TimerScheduler) hold the active connection/scheduler. These are set in `App.svelte` during session creation or restore.
 
 ### State flow
 
@@ -70,11 +70,11 @@ Programs (defined in `registry.js`) have `stages[]` → `exercises[]`. Each exer
 - **`rapid`**: hidden phase (`targetHiddenTime`) then visible phase (`timePerSeries`)
 - **`duell`**: repeated hidden/visible cycles (`targetHiddenTime`/`targetVisibleTime`) with `shotsPerShowing` shots each cycle
 
-Custom programs are stored in localStorage under key `opk-timer-custom-programs`.
+Custom programs are stored in localStorage under key `nsf-timer-custom-programs`.
 
 ### Session persistence
 
-On page load, `App.svelte` calls `restoreSession()` which reads `localStorage` for room and timer state and attempts to reconnect or reclaim the host's room code. All localStorage keys are prefixed with `opk-timer-`.
+On page load, `App.svelte` calls `restoreSession()` which reads `localStorage` for room and timer state and attempts to reconnect or reclaim the host's room code. All localStorage keys are prefixed with `nsf-timer-`.
 
 ### Malfunction (jam) rules
 

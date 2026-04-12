@@ -35,7 +35,7 @@
     try {
       const host = new SocketHost()
       const code = await host.createRoom()
-      window.__opkHost = host
+      window.__nsfHost = host
       saveRoomState({ code, isHost: true })
       currentView.set('lobby')
     } catch (e) {
@@ -63,7 +63,7 @@
     connecting = true
     try {
       const client = new SocketClient()
-      window.__opkClient = client
+      window.__nsfClient = client
       const code = await client.joinRoom(joinCode.trim(), { name: joinName.trim(), lane: joinLane.trim() })
       saveRoomState({ code, isHost: false, name: joinName.trim(), lane: joinLane.trim() })
       currentView.set('timer')
@@ -73,8 +73,8 @@
       } else {
         error = e.message || 'Failed to join room'
       }
-      try { window.__opkClient?.destroy() } catch {}
-      window.__opkClient = null
+      try { window.__nsfClient?.destroy() } catch {}
+      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -88,12 +88,12 @@
       if (room.isHost) {
         const host = new SocketHost()
         await host.createRoom(room.code)
-        window.__opkHost = host
+        window.__nsfHost = host
         saveRoomState({ code: room.code, isHost: true, programId: room.programId })
         if (room.programId) {
           const scheduler = new TimerScheduler()
           scheduler.loadProgram(room.programId)
-          window.__opkScheduler = scheduler
+          window.__nsfScheduler = scheduler
           scheduler.onStateChange((state) => {
             host.broadcastState(state)
           })
@@ -101,23 +101,23 @@
         currentView.set(room.programId ? 'timer' : 'lobby')
       } else if (room.isSpectator) {
         const client = new SocketClient()
-        window.__opkClient = client
+        window.__nsfClient = client
         await client.joinRoom(room.code, { role: 'spectator' })
         saveRoomState({ code: room.code, isHost: false, isSpectator: true })
         currentView.set('display')
       } else {
         const client = new SocketClient()
-        window.__opkClient = client
+        window.__nsfClient = client
         await client.joinRoom(room.code, { name: room.name || '', lane: room.lane || '' })
         saveRoomState({ code: room.code, isHost: false, name: room.name, lane: room.lane })
         currentView.set('timer')
       }
     } catch (e) {
       error = e.message || 'Failed to rejoin room'
-      try { window.__opkHost?.destroy() } catch {}
-      try { window.__opkClient?.destroy() } catch {}
-      window.__opkHost = null
-      window.__opkClient = null
+      try { window.__nsfHost?.destroy() } catch {}
+      try { window.__nsfClient?.destroy() } catch {}
+      window.__nsfHost = null
+      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -134,14 +134,14 @@
     connecting = true
     try {
       const client = new SocketClient()
-      window.__opkClient = client
+      window.__nsfClient = client
       await client.joinRoom(code, { role: 'spectator' })
       saveRoomState({ code, isHost: false, isSpectator: true })
       currentView.set('display')
     } catch (e) {
       error = e.message || 'Failed to join room'
       try { client.destroy() } catch {}
-      window.__opkClient = null
+      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -216,7 +216,7 @@
     </div>
   </div>
 
-  <p class="tagline">NSF 25m Competition Timer</p>
+  <p class="tagline">{$t('tagline')}</p>
 
   <div class="actions">
     <button class="btn-primary btn-large btn-create" onclick={createRoom} disabled={connecting}>
