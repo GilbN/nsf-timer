@@ -1,13 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
-export default defineConfig(({ command }) => ({
-  base: process.env.VITE_BASE_PATH || '/',
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+  base: env.VITE_BASE_PATH || '/',
   server: command === 'serve' ? {
-    https: process.env.VITE_HTTPS === 'true',
+    https: env.VITE_HTTPS === 'true',
     host: true,
     proxy: {
       '/ws': { target: 'ws://localhost:8080', ws: true },
@@ -37,4 +39,5 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
-}))
+  }
+})

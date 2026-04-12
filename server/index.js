@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 
-const PORT = process.env.PORT || 8080
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
+const WS_PORT = process.env.WS_PORT || 8080
+const WS_ALLOWED_ORIGINS = process.env.WS_ALLOWED_ORIGINS || '*'
 const HEARTBEAT_INTERVAL = 30_000
 const HEARTBEAT_TIMEOUT = 10_000
 const HOST_GRACE_PERIOD = 60_000 * 30 // 10 minutes for host to reconnect
@@ -245,10 +245,10 @@ function startHeartbeat(wss) {
 // --- Server setup ---
 
 const wss = new WebSocketServer({
-  port: PORT,
+  port: WS_PORT,
   verifyClient: ({ origin }, cb) => {
-    if (ALLOWED_ORIGINS === '*' || !origin) return cb(true)
-    const allowed = ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    if (WS_ALLOWED_ORIGINS === '*' || !origin) return cb(true)
+    const allowed = WS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
     cb(allowed.includes(origin), 403, 'Forbidden')
   },
 })
@@ -285,4 +285,4 @@ wss.on('connection', (ws) => {
 
 startHeartbeat(wss)
 
-console.log(`opk-timer relay server listening on ws://localhost:${PORT}`)
+console.log(`opk-timer relay server listening on ws://localhost:${WS_PORT}`)

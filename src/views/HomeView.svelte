@@ -180,6 +180,13 @@
     currentView.set('stopwatch')
   }
 
+  function startSolo() {
+    unlockAudio()
+    roomState.set({ code: null, isHost: true, isSolo: true, connectedPeers: [] })
+    saveRoomState({ isSolo: true, isHost: true })
+    currentView.set('lobby')
+  }
+
   function timeAgo(ts) {
     const diff = Date.now() - ts
     const min = Math.floor(diff / 60000)
@@ -258,14 +265,23 @@
       </div>
     </div>
 
-    <button class="btn-ghost stopwatch-btn" onclick={openStopwatch}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="13" r="8"/>
-        <polyline points="12 9 12 13 14.5 15"/>
-        <path d="M9 3h6M12 3v2"/>
-      </svg>
-      {$t('stopwatch')}
-    </button>
+    <div class="ghost-row">
+      <button class="btn-ghost" onclick={startSolo}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        {$t('soloMode')}
+      </button>
+      <button class="btn-ghost" onclick={openStopwatch}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="13" r="8"/>
+          <polyline points="12 9 12 13 14.5 15"/>
+          <path d="M9 3h6M12 3v2"/>
+        </svg>
+        {$t('stopwatch')}
+      </button>
+    </div>
 
     <button class="btn-ghost display-btn" onclick={() => { showDisplayForm = !showDisplayForm; error = '' }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -531,6 +547,15 @@
   .btn-ghost:hover {
     color: var(--text-primary);
     border-color: rgba(255,255,255,0.15);
+  }
+
+  .ghost-row {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .ghost-row .btn-ghost {
+    flex: 1;
   }
 
   /* ── Recent rooms ── */

@@ -141,7 +141,7 @@
     }
     window.__opkHost?.resetAllJams()
     clearTimerState()
-    saveRoomState({ code: $roomState.code, isHost: true })
+    saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo })
     currentView.set('lobby')
   }
 
@@ -178,7 +178,9 @@
 <div class="view timer-view">
   <!-- Top bar -->
   <div class="top-bar">
-    {#if $roomState.code}
+    {#if $roomState.isSolo}
+      <div class="solo-badge">{$t('soloMode')}</div>
+    {:else if $roomState.code}
       <RoomCode code={$roomState.code} />
     {/if}
     {#if initialIsClient}
@@ -283,6 +285,19 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 40px;
+  }
+
+  .solo-badge {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    padding: 0.35rem 0.7rem;
+    background: var(--bg-surface);
+    border: 1px solid rgba(0, 230, 118, 0.2);
+    border-radius: var(--radius);
+    text-transform: uppercase;
   }
 
   .top-actions {

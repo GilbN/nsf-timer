@@ -35,7 +35,7 @@ For internet-facing deployments, restrict WebSocket origins:
 
 ```bash
 docker run -d -p 80:80 \
-  -e ALLOWED_ORIGINS=https://timer.example.com \
+  -e WS_ALLOWED_ORIGINS=https://timer.example.com \
   ghcr.io/gilbn/opk-timer:latest
 ```
 
@@ -51,7 +51,7 @@ services:
       - "80:80"
     restart: unless-stopped
     environment:
-      ALLOWED_ORIGINS: "*"
+      WS_ALLOWED_ORIGINS: "*"
 ```
 
 ## Tech stack
@@ -76,8 +76,8 @@ services:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `8080` | Port the WebSocket relay server listens on |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated list of allowed origins for WebSocket connections |
+| `WS_PORT` | `8080` | Port the WebSocket relay server listens on |
+| `WS_ALLOWED_ORIGINS` | `*` | Comma-separated list of allowed origins for WebSocket connections |
 
 ## Getting started
 
