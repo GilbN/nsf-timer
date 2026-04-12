@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outDir = join(__dirname, '..', 'public', 'icons')
 
-// Same geometry as the HomeView wordmark-icon, with explicit colours.
+// Uses the same circle layout as the HomeView wordmark-icon, but with
+// icon-specific explicit colours and stroke/opacity values for PNG output.
 // Background matches theme_color / background_color from vite.config.js.
 const svgTemplate = (size) => {
   const bg = '#0d0d1a'
