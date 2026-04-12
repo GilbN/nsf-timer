@@ -82,7 +82,7 @@
       trialShots: 0,
       stages: stages.map((ds, i) => ({
         ...ds,
-        id: ds.id.startsWith('ds-') ? `ds${i + 1}` : ds.id,
+        id: `ds${i + 1}`,
         name: ds.name.no
           ? { no: ds.name.no, en: ds.name.no }
           : { no: `Delserie ${i + 1}`, en: `Stage ${i + 1}` },

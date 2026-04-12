@@ -68,7 +68,11 @@ export function loadCustomPrograms() {
 export function updateCustomProgram(program) {
   const programs = loadCustomPrograms()
   const idx = programs.findIndex(p => p.id === program.id)
-  if (idx !== -1) programs[idx] = program
+  if (idx !== -1) {
+    programs[idx] = program
+  } else {
+    programs.push(program)
+  }
   saveCustomPrograms(programs)
 }
 
