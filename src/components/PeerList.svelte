@@ -2,24 +2,25 @@
   import { roomState, timerState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
 
-  let { onReshoot } = $props()
+  let { onReshoot, onClose } = $props()
 
   let peers = $derived($roomState.connectedPeers || [])
   let canReshoot = $derived($timerState.phase === 'stopped' || $timerState.phase === 'idle')
-  let expanded = $state(true)
+
+  $effect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
 </script>
 
-<div class="peer-list">
-  <button class="peer-list-header" onclick={() => expanded = !expanded}>
-    <span class="header-label">{$t('shooters')} <span class="peer-count">{peers.length}</span></span>
-    <span class="chevron" class:open={expanded}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="6 9 12 15 18 9"/>
-      </svg>
-    </span>
-  </button>
+<div class="modal-backdrop" role="presentation" onclick={onClose}>
+  <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+    <div class="modal-header">
+      <h2 class="modal-title">{$t('shooters')}</h2>
+      <span class="peer-count">{peers.length}</span>
+    </div>
 
-  {#if expanded}
     <div class="peer-items">
       {#if peers.length === 0}
         <div class="empty">{$t('noPeers')}</div>
@@ -42,84 +43,88 @@
         </div>
       {/each}
     </div>
-  {/if}
+
+    <div class="modal-actions">
+      <button class="btn-close" onclick={onClose}>{$t('back')}</button>
+    </div>
+  </div>
 </div>
 
 <style>
-  .peer-list {
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: var(--radius);
-    overflow: hidden;
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .peer-list-header {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
+  .modal-panel {
     background: var(--bg-secondary);
-    border-radius: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg, var(--radius));
+    padding: 1.25rem;
+    width: min(90vw, 380px);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
-  .header-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--text-secondary);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+  .modal-header {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
+  }
+
+  .modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: 0.04em;
   }
 
   .peer-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
     border-radius: 100px;
     background: var(--bg-surface);
     color: var(--accent);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 700;
-  }
-
-  .chevron {
-    display: flex;
-    align-items: center;
-    width: 16px;
-    height: 16px;
-    color: var(--text-secondary);
-    transition: transform 0.15s;
-    opacity: 0.6;
-  }
-
-  .chevron svg { width: 100%; height: 100%; }
-
-  .chevron.open {
-    transform: rotate(180deg);
   }
 
   .peer-items {
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius);
   }
 
   .empty {
-    padding: 0.6rem 0.75rem;
+    padding: 0.75rem;
     text-align: center;
     color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .peer-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.45rem 0.75rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .peer-item + .peer-item {
     border-top: 1px solid rgba(255,255,255,0.04);
   }
 
@@ -164,7 +169,7 @@
   .jam-count.maxed   { color: var(--danger); }
 
   .btn-reshoot {
-    padding: 0.25rem 0.6rem;
+    padding: 0.3rem 0.7rem;
     font-size: 0.75rem;
     font-weight: 700;
     background: rgba(255, 181, 71, 0.12);
@@ -177,5 +182,25 @@
 
   .btn-reshoot:hover {
     background: rgba(255, 181, 71, 0.22);
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-close {
+    padding: 0.45rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+  }
+
+  .btn-close:hover {
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,0.15);
   }
 </style>

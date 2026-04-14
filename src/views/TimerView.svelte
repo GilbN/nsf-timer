@@ -106,12 +106,15 @@
   })
 
   function handleStart() { window.__nsfScheduler?.startSeries() }
+  function handleRestart() { window.__nsfScheduler?.restartSeries() }
+  function handleNextSeries() { window.__nsfScheduler?.nextSeries() }
   function handlePause() { window.__nsfScheduler?.pause() }
   function handleResume() { window.__nsfScheduler?.resume() }
   function handleStop() { window.__nsfScheduler?.stop() }
   function handleNext() { window.__nsfScheduler?.nextExercise() }
 
   let showJumpModal = $state(false)
+  let showPeerModal = $state(false)
 
   function handleReset() {
     if (!confirm(get(t)('confirmReset'))) return
@@ -196,77 +199,106 @@
     <ConnectionStatus status={connectionStatus} variant="banner" />
   {/if}
 
-  <!-- Reshoot banner -->
-  {#if $timerState.isReshoot && $timerState.reshootPeerName}
-    <div class="reshoot-banner">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="reshoot-icon">
-        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-        <path d="M3 3v5h5"/>
-      </svg>
-      {$t('reshootFor')} {$timerState.reshootPeerName}
-    </div>
-  {/if}
-
-  <!-- Stage / program complete banner -->
-  {#if $timerState.stageComplete}
-    <div class="stage-complete-banner">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="banner-icon">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-      {#if hasNextStage}
-        {$t('stageComplete')}
-        {#if isHost}<span class="banner-hint">→ {$t('nextStage')}</span>{/if}
-      {:else}
-        {$t('programComplete')}
+  <div class="split-body">
+    <!-- LEFT pane: timer + banners -->
+    <div class="pane-timer">
+      <!-- Reshoot banner -->
+      {#if $timerState.isReshoot && $timerState.reshootPeerName}
+        <div class="reshoot-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="reshoot-icon">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          {$t('reshootFor')} {$timerState.reshootPeerName}
+        </div>
       {/if}
+
+      <!-- Stage / program complete banner -->
+      {#if $timerState.stageComplete}
+        <div class="stage-complete-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="banner-icon">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          {#if hasNextStage}
+            {$t('stageComplete')}
+            {#if isHost}
+              {@const nextStage = program?.stages[$timerState.stageIndex + 1]}
+              <span class="banner-hint">
+                → {$t('nextStageLabel')}{#if nextStage}: <strong>{getLocalizedName(nextStage.name, $preferences.lang)}</strong>{/if}
+              </span>
+            {/if}
+          {:else}
+            {$t('programComplete')}
+          {/if}
+        </div>
+      {/if}
+
+      <!-- Timer centrepiece -->
+      <div class="timer-area">
+        <TimerDisplay />
+      </div>
     </div>
-  {/if}
 
-  <!-- Timer centrepiece -->
-  <div class="timer-area">
-    <TimerDisplay />
-  </div>
+    <!-- RIGHT pane: series info, controls, peers, actions -->
+    <div class="pane-controls">
+      <!-- Series info -->
+      <SeriesProgress />
 
-  <!-- Series info -->
-  <SeriesProgress />
+      <!-- Controls -->
+      {#if isHost}
+        <ControlBar
+          onStart={handleStart}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+          onRestart={handleRestart}
+          onNextSeries={handleNextSeries}
+          onNext={handleNext}
+          onReset={handleReset}
+        >
+          {#snippet bottomExtra()}
+            {#if $roomState.connectedPeers?.length > 0}
+              <button class="btn-shooters" onclick={() => (showPeerModal = true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                {$t('shooters')}
+                <span class="shooters-count">{$roomState.connectedPeers.length}</span>
+              </button>
+            {/if}
+          {/snippet}
+        </ControlBar>
+      {:else if !initialIsClient}
+        <ControlBar
+          onStart={handleStart}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+          onRestart={handleRestart}
+          onNextSeries={handleNextSeries}
+          onNext={handleNext}
+          onReset={handleReset}
+        />
+      {:else if $timerState.phase === 'idle'}
+        <div class="client-hint">{$t('waitingForHost')}</div>
+      {/if}
 
-  <!-- Controls -->
-  {#if isHost}
-    <ControlBar
-      onStart={handleStart}
-      onPause={handlePause}
-      onResume={handleResume}
-      onStop={handleStop}
-      onNext={handleNext}
-      onReset={handleReset}
-    />
-    {#if $roomState.connectedPeers?.length > 0}
-      <PeerList onReshoot={handleReshoot} />
-    {/if}
-  {:else if !initialIsClient}
-    <ControlBar
-      onStart={handleStart}
-      onPause={handlePause}
-      onResume={handleResume}
-      onStop={handleStop}
-      onNext={handleNext}
-      onReset={handleReset}
-    />
-  {:else if $timerState.phase === 'idle'}
-    <div class="client-hint">{$t('waitingForHost')}</div>
-  {/if}
-
-  <!-- Bottom utility actions -->
-  <div class="bottom-actions">
-    {#if isHost && ($timerState.phase === 'idle' || $timerState.phase === 'stopped')}
-      <button class="btn-text" onclick={changeProgram}>{$t('changeProgram')}</button>
-      <span class="sep">·</span>
-      <button class="btn-text" onclick={() => (showJumpModal = true)}>{$t('jumpToPosition')}</button>
-      <span class="sep">·</span>
-    {/if}
-    <button class="btn-text" onclick={() => window.location.reload()}>{$t('refresh')}</button>
-    <span class="sep">·</span>
-    <button class="btn-text danger" onclick={disconnect}>{$t('disconnect')}</button>
+      <!-- Bottom utility actions -->
+      <div class="bottom-actions">
+        {#if isHost && ($timerState.phase === 'idle' || $timerState.phase === 'stopped')}
+          <button class="btn-text" onclick={changeProgram}>{$t('changeProgram')}</button>
+          <span class="sep">·</span>
+          <button class="btn-text" onclick={() => (showJumpModal = true)}>{$t('jumpToPosition')}</button>
+          <span class="sep">·</span>
+        {/if}
+        <button class="btn-text" onclick={() => window.location.reload()}>{$t('refresh')}</button>
+        <span class="sep">·</span>
+        <button class="btn-text danger" onclick={disconnect}>{$t('disconnect')}</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -274,9 +306,14 @@
   <JumpToModal {program} onClose={() => (showJumpModal = false)} />
 {/if}
 
+{#if showPeerModal}
+  <PeerList onReshoot={handleReshoot} onClose={() => (showPeerModal = false)} />
+{/if}
+
 <style>
   .timer-view {
     gap: 0.4rem;
+    padding-bottom: 0;
   }
 
   /* ── Top bar ── */
@@ -306,25 +343,6 @@
     align-items: center;
     margin-left: auto;
   }
-
-  .icon-btn {
-    background: var(--bg-surface);
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 0.4rem;
-    min-width: 40px;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius);
-  }
-
-  .icon-btn svg {
-    width: 18px;
-    height: 18px;
-    color: var(--text-secondary);
-  }
-
 
   /* ── Stage complete banner ── */
   .stage-complete-banner {
@@ -375,12 +393,32 @@
     flex-shrink: 0;
   }
 
+  /* ── Split body: portrait = stacked column, landscape = side-by-side ── */
+  .split-body {
+    display: contents;
+  }
+
+  .pane-timer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .pane-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
   /* ── Timer area ── */
   .timer-area {
     flex: 1;
     display: flex;
     align-items: stretch;
     min-height: 160px;
+    padding: 0.5rem 0;
   }
 
   /* ── Client hint ── */
@@ -399,6 +437,7 @@
     gap: 0.35rem;
     padding: 0.25rem 0;
     padding-bottom: env(safe-area-inset-bottom, 0);
+    margin-top: auto;
   }
 
   .btn-text {
@@ -422,13 +461,82 @@
     opacity: 0.3;
   }
 
-  /* ── Landscape on mobile: compress vertical spacing ── */
+  /* ── Shooters trigger button ── */
+  .btn-shooters {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem;
+    min-height: 36px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius);
+  }
+
+  .btn-shooters svg {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+  }
+
+  .btn-shooters:hover {
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,0.15);
+  }
+
+  .shooters-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 100px;
+    background: rgba(0, 230, 118, 0.12);
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  /* ── Landscape on mobile: split view ── */
   @media (orientation: landscape) and (max-height: 500px) {
     .timer-view { gap: 0.2rem; }
     .top-bar    { min-height: 32px; }
-    .timer-area { min-height: 80px; }
+
+    .split-body {
+      display: flex;
+      flex: 1;
+      gap: 0.75rem;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-timer {
+      flex: 1;
+      min-width: 0;
+      gap: 0.2rem;
+    }
+
+    .pane-timer .timer-area {
+      min-height: 0;
+    }
+
+    .pane-controls {
+      flex: 1;
+      min-width: 0;
+      gap: 0.25rem;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .client-hint { padding: 0.25rem; font-size: 0.75rem; }
     .bottom-actions { padding: 0.1rem 0; }
+    :global(.control-bar) { margin-top: auto; }
     .stage-complete-banner,
     .reshoot-banner { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
   }

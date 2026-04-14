@@ -7,7 +7,7 @@
 
 import { loadCustomPrograms } from '../storage'
 
-const DEFAULT_LOADING_TIME = 60
+const DEFAULT_LOADING_TIME = 6
 const DEFAULT_TARGET_HIDDEN_TIME = 7
 const DEFAULT_TARGET_VISIBLE_TIME_DUEL = 3
 const TARGET_DISPLAY_TIME_OFFSET_DUEL = 0.29 // At the range the target uses .29 seconds to transition between hidden and visible, so this needs to be added to the visible time to get the correct timing for when the target is fully
@@ -25,7 +25,7 @@ export const programs = [
     stages: [
       {
         id: 'trial-ds1',
-        name: { no: 'Prøveserie 1', en: 'Trial 1' },
+        name: { no: 'Prøveserie 1', en: 'Sighting Series 1' },
         isTrialStage: true,
         type: 'precision',
         exercises: [{
@@ -50,13 +50,14 @@ export const programs = [
       },
       {
         id: 'trial-ds2',
-        name: { no: 'Prøveserie 2', en: 'Trial 2' },
+        name: { no: 'Prøveserie 2', en: 'Sighting Series 2' },
         isTrialStage: true,
         type: 'precision',
         exercises: [{
           seriesCount: 1,
           shotsPerSeries: 5,
           timePerSeries: 300,
+          targetHiddenTime: DEFAULT_TARGET_HIDDEN_TIME,
           loadingTime: DEFAULT_LOADING_TIME,
         }],
       },
@@ -87,7 +88,7 @@ export const programs = [
     stages: [
       {
         id: 'trial',
-        name: { no: 'Prøveserie', en: 'Trial' },
+        name: { no: 'Prøveserie', en: 'Sighting Series' },
         isTrialStage: true,
         type: 'precision',
         exercises: [{
@@ -148,7 +149,7 @@ export const programs = [
     stages: [
       {
         id: 'trial-ds1',
-        name: { no: 'Prøveserie 1', en: 'Trial 1' },
+        name: { no: 'Prøveserie 1', en: 'Sighting Series 1' },
         isTrialStage: true,
         type: 'rapid',
         exercises: [{
@@ -171,7 +172,7 @@ export const programs = [
       },
       {
         id: 'trial-ds2',
-        name: { no: 'Prøveserie 2', en: 'Trial 2' },
+        name: { no: 'Prøveserie 2', en: 'Sighting Series 2' },
         isTrialStage: true,
         type: 'rapid',
         exercises: [{
@@ -206,7 +207,7 @@ export const programs = [
     stages: [
       {
         id: 'trial',
-        name: { no: 'Prøveserie', en: 'Trial' },
+        name: { no: 'Prøveserie', en: 'Sighting Series' },
         isTrialStage: true,
         type: 'precision',
         exercises: [{
@@ -282,7 +283,7 @@ export const programs = [
     stages: [
       {
         id: 'trial',
-        name: { no: 'Prøveserie', en: 'Trial' },
+        name: { no: 'Prøveserie', en: 'Sighting Series' },
         isTrialStage: true,
         type: 'rapid',
         exercises: [{

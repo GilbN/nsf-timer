@@ -46,6 +46,7 @@ export class TimerScheduler {
       isReshoot: false,
       reshootPeerName: null,
       stageComplete: false,
+      stoppedReason: null,
     }
     this._updateState({})
   }
@@ -75,6 +76,7 @@ export class TimerScheduler {
           phase: 'stopped',
           remainingMs: 0,
           targetVisible: false,
+          stoppedReason: savedState.stoppedReason ?? 'aborted',
         }
       } else {
         // Time remains — resume the countdown
@@ -147,10 +149,13 @@ export class TimerScheduler {
   }
 
   /**
-   * Start the current series: loading phase first, then shooting.
+   * Internal: run the loading → shooting pipeline for the given series index.
+   * Shared by startSeries(), nextSeries(), and restartSeries().
    */
-  startSeries() {
-    const exercise = this.getCurrentExercise()
+  _runSeries(seriesIdx) {
+    const stage = this.getCurrentStage()
+    if (!stage) return
+    const exercise = stage.exercises[this.state.exerciseIndex]
     if (!exercise) return
 
     this.engine.stop()
@@ -159,6 +164,7 @@ export class TimerScheduler {
     const loadingMs = (exercise.loadingTime || 60) * 1000
     this._updateState({
       phase: 'loading',
+      seriesIndex: seriesIdx,
       remainingMs: loadingMs,
       totalMs: loadingMs,
       targetVisible: false,
@@ -166,6 +172,7 @@ export class TimerScheduler {
       isReshoot: false,
       reshootPeerName: null,
       stageComplete: false,
+      stoppedReason: null,
     })
 
     beepStart()
@@ -175,6 +182,62 @@ export class TimerScheduler {
     }, () => {
       this._startShooting()
     })
+  }
+
+  /**
+   * Start the current series: loading phase first, then shooting.
+   */
+  startSeries() {
+    this._runSeries(this.state.seriesIndex)
+  }
+
+  /**
+   * Start the next series. After a natural completion `seriesIndex` is
+   * already advanced; after a manual abort it still points at the aborted
+   * series, so we advance it here. No-op if there's no next series to run.
+   */
+  nextSeries() {
+    const stage = this.getCurrentStage()
+    const exercise = stage?.exercises[this.state.exerciseIndex]
+    if (!exercise) return
+
+    const target = this.state.stoppedReason === 'aborted'
+      ? this.state.seriesIndex + 1
+      : this.state.seriesIndex
+
+    if (target >= exercise.seriesCount) return
+    this._runSeries(target)
+  }
+
+  /**
+   * Restart a series. Target depends on why we stopped:
+   *  - 'aborted'          → current seriesIndex (the aborted series)
+   *  - 'seriesComplete'   → seriesIndex - 1 (the series that just finished)
+   *  - 'exerciseComplete' → last series of the just-finished exercise
+   *  - 'stageComplete'    → last series of the just-finished exercise
+   *  - 'programComplete'  → last series of the just-finished exercise
+   */
+  restartSeries() {
+    const stage = this.getCurrentStage()
+    const exercise = stage?.exercises[this.state.exerciseIndex]
+    if (!exercise) return
+
+    let target = this.state.seriesIndex
+    switch (this.state.stoppedReason) {
+      case 'seriesComplete':
+        target = Math.max(0, this.state.seriesIndex - 1)
+        break
+      case 'exerciseComplete':
+      case 'stageComplete':
+      case 'programComplete':
+        target = exercise.seriesCount - 1
+        break
+      case 'aborted':
+      default:
+        target = this.state.seriesIndex
+    }
+
+    this._runSeries(target)
   }
 
   /**
@@ -197,6 +260,7 @@ export class TimerScheduler {
       phaseStartedAt: Date.now(),
       isReshoot: true,
       reshootPeerName: peerName,
+      stoppedReason: null,
     })
 
     beepStart()
@@ -328,13 +392,13 @@ export class TimerScheduler {
     const wasReshoot = this.state.isReshoot
 
     if (wasReshoot) {
-      // Reshoot complete — go back to stopped, not advancing series
       this._updateState({
         phase: 'stopped',
         remainingMs: 0,
         targetVisible: false,
         isReshoot: false,
         reshootPeerName: null,
+        stoppedReason: 'aborted',
       })
       return
     }
@@ -351,17 +415,31 @@ export class TimerScheduler {
         remainingMs: 0,
         targetVisible: false,
         stageComplete: false,
+        stoppedReason: 'seriesComplete',
       })
-    } else {
-      // Last series of this exercise done — check if it's the last exercise in the stage
-      const isLastExerciseInStage = this.state.exerciseIndex === stage.exercises.length - 1
-      this._updateState({
-        phase: 'stopped',
-        remainingMs: 0,
-        targetVisible: false,
-        stageComplete: isLastExerciseInStage,
-      })
+      return
     }
+
+    // Last series of this exercise just finished.
+    const isLastExerciseInStage = this.state.exerciseIndex === stage.exercises.length - 1
+    const isLastStage = this.state.stageIndex === this.program.stages.length - 1
+
+    let stoppedReason
+    if (!isLastExerciseInStage) {
+      stoppedReason = 'exerciseComplete'
+    } else if (!isLastStage) {
+      stoppedReason = 'stageComplete'
+    } else {
+      stoppedReason = 'programComplete'
+    }
+
+    this._updateState({
+      phase: 'stopped',
+      remainingMs: 0,
+      targetVisible: false,
+      stageComplete: isLastExerciseInStage,
+      stoppedReason,
+    })
   }
 
   nextExercise() {
@@ -381,6 +459,7 @@ export class TimerScheduler {
         isReshoot: false,
         reshootPeerName: null,
         stageComplete: false,
+        stoppedReason: null,
       })
       return
     }
@@ -398,6 +477,7 @@ export class TimerScheduler {
         isReshoot: false,
         reshootPeerName: null,
         stageComplete: false,
+        stoppedReason: null,
       })
       return
     }
@@ -406,6 +486,7 @@ export class TimerScheduler {
       phase: 'stopped',
       remainingMs: 0,
       targetVisible: false,
+      stoppedReason: 'programComplete',
     })
   }
 
@@ -425,6 +506,7 @@ export class TimerScheduler {
     this._updateState({
       phase: isLoading ? 'loading' : 'shooting',
       phaseStartedAt: Date.now(),
+      stoppedReason: null,
     })
   }
 
@@ -446,6 +528,7 @@ export class TimerScheduler {
         isReshoot: false,
         reshootPeerName: null,
         stageComplete: false,
+        stoppedReason: null,
       })
     }
   }
@@ -478,6 +561,7 @@ export class TimerScheduler {
       isReshoot: false,
       reshootPeerName: null,
       stageComplete: false,
+      stoppedReason: null,
     })
   }
 
@@ -490,6 +574,7 @@ export class TimerScheduler {
       targetVisible: false,
       isReshoot: false,
       reshootPeerName: null,
+      stoppedReason: 'aborted',
     })
   }
 
