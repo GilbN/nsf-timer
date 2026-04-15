@@ -4,11 +4,13 @@
   import { SocketHost } from './lib/peer/SocketHost.js'
   import { SocketClient } from './lib/peer/SocketClient.js'
   import { TimerScheduler } from './lib/timer/TimerScheduler.js'
+  import { registerUpdateHandler } from './lib/updateAvailable.js'
   import HomeView from './views/HomeView.svelte'
   import LobbyView from './views/LobbyView.svelte'
   import TimerView from './views/TimerView.svelte'
   import StopwatchView from './views/StopwatchView.svelte'
   import DisplayView from './views/DisplayView.svelte'
+  import UpdateModal from './components/UpdateModal.svelte'
 
   // Restore preferences on load
   const savedPrefs = loadPreferences()
@@ -24,6 +26,9 @@
 
   // Attempt session restore on page load
   restoreSession()
+
+  // Start listening for service-worker updates
+  registerUpdateHandler()
 
   async function restoreSession() {
     const savedRoom = loadRoomState()
@@ -110,3 +115,5 @@
 {:else if $currentView === 'display'}
   <DisplayView />
 {/if}
+
+<UpdateModal />
