@@ -248,6 +248,8 @@ export class SocketHost {
       ...s,
       code: this.code,
       isHost: true,
+      isSolo: false,
+      isSpectator: false,
       connectedPeers: peers,
     }))
     if (this._onPeersChange) this._onPeersChange(peers)

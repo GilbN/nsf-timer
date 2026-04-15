@@ -66,6 +66,7 @@
     }
     clearTimerState()
     clearRoomState()
+    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
     currentView.set('home')
   }
 </script>
