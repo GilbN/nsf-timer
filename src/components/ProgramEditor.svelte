@@ -4,7 +4,14 @@
 
   let { onSave, onCancel, editProgram = null } = $props()
 
+  // Initial state is seeded from editProgram at mount time. The component is
+  // re-mounted whenever the editor opens (via {#if showEditor} in LobbyView),
+  // so capturing the initial prop value is exactly the intended behavior —
+  // the user's subsequent edits to `name`/`stages` must not be overwritten
+  // by prop reactivity.
+  /* svelte-ignore state_referenced_locally */
   let name = $state(editProgram ? editProgram.name.no : '')
+  /* svelte-ignore state_referenced_locally */
   let stages = $state(editProgram ? JSON.parse(JSON.stringify(editProgram.stages)) : [createStage()])
 
   function createStage() {

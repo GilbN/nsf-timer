@@ -15,6 +15,7 @@
 </script>
 
 <div class="modal-backdrop" role="presentation" onclick={onClose}>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="peer-list-title" tabindex="-1" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2 id="peer-list-title" class="modal-title">{$t('shooters')}</h2>
