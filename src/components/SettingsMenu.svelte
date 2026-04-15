@@ -2,6 +2,7 @@
   import { preferences } from '../lib/stores.js'
   import { savePreferences } from '../lib/storage.js'
   import { t } from '../lib/i18n.js'
+  import { updateAvailable, updateDismissed } from '../lib/updateAvailable.js'
 
   let open = $state(false)
   let showAbout = $state(false)
@@ -62,6 +63,11 @@
     open = false
   }
 
+  function openUpdateModal() {
+    updateDismissed.set(false)
+    close()
+  }
+
   $effect(() => {
     if (open) {
       document.addEventListener('click', handleOutside)
@@ -86,10 +92,29 @@
       <line x1="4" y1="12" x2="20" y2="12"/>
       <line x1="4" y1="18" x2="20" y2="18"/>
     </svg>
+    {#if $updateAvailable}
+      <span class="update-dot" aria-hidden="true"></span>
+    {/if}
   </button>
 
   {#if open}
     <div class="panel" role="menu">
+
+      {#if $updateAvailable}
+        <button class="row row-update" onclick={openUpdateModal} role="menuitem">
+          <span class="row-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15A9 9 0 1 1 18 6.3L23 10"/>
+            </svg>
+          </span>
+          <span class="row-label">
+            {$t('updateAvailableReload')}
+            <span class="update-dot update-dot-inline" aria-hidden="true"></span>
+          </span>
+        </button>
+        <div class="divider"></div>
+      {/if}
 
       <!-- Wake lock -->
       <button class="row" onclick={() => toggle('wakeLockEnabled')} role="menuitem">
@@ -229,6 +254,7 @@
 
   /* icon-btn is defined in TimerView — replicate here for portability */
   .icon-btn {
+    position: relative;
     background: var(--bg-surface);
     border: 1px solid rgba(255,255,255,0.06);
     padding: 0;
@@ -254,6 +280,52 @@
 
   .icon-btn.open svg {
     color: var(--text-primary);
+  }
+
+  .update-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning);
+    box-shadow: 0 0 0 2px var(--bg-primary);
+    animation: update-dot-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes update-dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 0 rgba(255, 181, 71, 0.55);
+    }
+    50% {
+      transform: scale(1.15);
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 6px rgba(255, 181, 71, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .update-dot {
+      animation: none;
+    }
+  }
+
+  .row-update {
+    color: var(--accent);
+  }
+
+  .row-update .row-label {
+    color: var(--accent);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .update-dot-inline {
+    position: static;
+    box-shadow: 0 0 0 0 rgba(255, 181, 71, 0.55);
   }
 
   /* ── Panel ── */

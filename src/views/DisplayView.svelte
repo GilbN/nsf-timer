@@ -514,8 +514,6 @@
 
   .info-row.duel { color: var(--warning); }
 
-  /* Portrait-only element: hide in landscape */
-  .portrait-only { display: flex; }
 
   /* ── Landscape layout: side-by-side ── */
   @media (orientation: landscape) {
@@ -545,9 +543,6 @@
       min-height: 0;
       align-self: stretch;
     }
-
-    /* In landscape, hide portrait-only items */
-    .portrait-only { display: none; }
 
     /* Slightly smaller digits in landscape since height is the constraint */
     .digits {

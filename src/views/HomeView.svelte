@@ -729,11 +729,6 @@
     flex-shrink: 0;
   }
 
-  .btn-icon {
-    width: 1em;
-    height: 1em;
-    flex-shrink: 0;
-  }
 
   /* ── Display screen ── */
   .display-btn {

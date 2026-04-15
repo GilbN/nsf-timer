@@ -27,7 +27,7 @@ export default defineConfig(({ command, mode }) => {
     tailwindcss(),
     svelte(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'NSF Timer',
         short_name: 'NSF Timer',

@@ -6,16 +6,23 @@
 
   let peers = $derived($roomState.connectedPeers || [])
   let canReshoot = $derived($timerState.phase === 'stopped' || $timerState.phase === 'idle')
+  let panelEl = $state(null)
 
   $effect(() => {
+    const previouslyFocused = document.activeElement
+    panelEl?.focus()
     function onKey(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
+    }
   })
 </script>
 
 <div class="modal-backdrop" role="presentation" onclick={onClose}>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="peer-list-title" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="peer-list-title" tabindex="-1" bind:this={panelEl} onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2 id="peer-list-title" class="modal-title">{$t('shooters')}</h2>
       <span class="peer-count">{peers.length}</span>
