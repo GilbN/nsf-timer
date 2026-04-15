@@ -251,6 +251,10 @@ export class TimerScheduler {
     this.engine.stop()
     this._clearDuelTimer()
 
+    // Stash the pre-reshoot stoppedReason so nextSeries()/restartSeries()
+    // can resume correctly after the reshoot completes.
+    this._preReshootStoppedReason = this.state.stoppedReason ?? null
+
     const loadingMs = (exercise.loadingTime || 60) * 1000
     this._updateState({
       phase: 'loading',
@@ -392,13 +396,18 @@ export class TimerScheduler {
     const wasReshoot = this.state.isReshoot
 
     if (wasReshoot) {
+      // Restore the pre-reshoot stoppedReason so the series state-machine
+      // (nextSeries/restartSeries) picks up where it left off rather than
+      // treating the reshoot as a manual abort.
+      const restoredReason = this._preReshootStoppedReason ?? null
+      this._preReshootStoppedReason = null
       this._updateState({
         phase: 'stopped',
         remainingMs: 0,
         targetVisible: false,
         isReshoot: false,
         reshootPeerName: null,
-        stoppedReason: 'aborted',
+        stoppedReason: restoredReason,
       })
       return
     }

@@ -15,9 +15,9 @@
 </script>
 
 <div class="modal-backdrop" role="presentation" onclick={onClose}>
-  <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="peer-list-title" tabindex="-1" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
-      <h2 class="modal-title">{$t('shooters')}</h2>
+      <h2 id="peer-list-title" class="modal-title">{$t('shooters')}</h2>
       <span class="peer-count">{peers.length}</span>
     </div>
 

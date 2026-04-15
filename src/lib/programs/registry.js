@@ -7,10 +7,10 @@
 
 import { loadCustomPrograms } from '../storage'
 
-const DEFAULT_LOADING_TIME = 6
+const DEFAULT_LOADING_TIME = 60
 const DEFAULT_TARGET_HIDDEN_TIME = 7
 const DEFAULT_TARGET_VISIBLE_TIME_DUEL = 3
-const TARGET_DISPLAY_TIME_OFFSET_DUEL = 0.29 // At the range the target uses .29 seconds to transition between hidden and visible, so this needs to be added to the visible time to get the correct timing for when the target is fully
+const TARGET_DISPLAY_TIME_OFFSET_DUEL = 0.29 // At the range the target uses .29 seconds to transition between hidden and visible, so this needs to be added to the visible time to get the correct timing for when the target is fully visible
 
 export const programs = [
   {
