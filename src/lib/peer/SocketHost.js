@@ -69,10 +69,17 @@ export class SocketHost {
           reject = null
         } else if (envelope.action === 'ERROR') {
           if (envelope.reason === 'code_taken' && !existingCode) {
-            // Retry with a fresh code (only when not restoring a session)
+            // Retry with a fresh code (only when not restoring a session).
+            // Hand off the pending promise to the new socket *before* closing
+            // this one — otherwise ws.onclose fires the old reject handler
+            // and the outer promise is rejected before the retry succeeds.
+            const pendingResolve = resolve
+            const pendingReject = reject
+            resolve = null
+            reject = null
             this.code = this.generateCode()
             ws.close()
-            this._openSocket(resolve, reject, null)
+            this._openSocket(pendingResolve, pendingReject, null)
           } else {
             reject(new Error(envelope.reason))
             resolve = null

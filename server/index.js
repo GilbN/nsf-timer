@@ -4,7 +4,8 @@ const WS_PORT = process.env.WS_PORT || 8080
 const WS_ALLOWED_ORIGINS = process.env.WS_ALLOWED_ORIGINS || '*'
 const HEARTBEAT_INTERVAL = 30_000
 const HEARTBEAT_TIMEOUT = 10_000
-const HOST_GRACE_PERIOD = 60_000 * 30 // 10 minutes for host to reconnect
+const DEFAULT_HOST_GRACE_PERIOD = 60_000 * 30 // 30 minutes for host to reconnect
+let HOST_GRACE_PERIOD = DEFAULT_HOST_GRACE_PERIOD
 
 // roomCode → { host: WebSocket|null, clients: Map<peerId, { ws, name, lane }>, lastState: object|null, graceTimer: number|null }
 const rooms = new Map()
@@ -231,7 +232,7 @@ function handleClose(ws) {
 // --- Heartbeat ---
 
 function startHeartbeat(wss) {
-  setInterval(() => {
+  return setInterval(() => {
     for (const ws of wss.clients) {
       ws._alive = false
       ws.ping()
@@ -244,45 +245,80 @@ function startHeartbeat(wss) {
 
 // --- Server setup ---
 
-const wss = new WebSocketServer({
-  port: WS_PORT,
-  verifyClient: ({ origin }, cb) => {
-    if (WS_ALLOWED_ORIGINS === '*' || !origin) return cb(true)
-    const allowed = WS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    cb(allowed.includes(origin), 403, 'Forbidden')
-  },
-})
-
-wss.on('connection', (ws) => {
-  ws._alive = true
-
-  ws.on('pong', () => {
+function setupConnectionHandler(wss) {
+  wss.on('connection', (ws) => {
     ws._alive = true
-    clearTimeout(ws._heartbeatTimer)
+
+    ws.on('pong', () => {
+      ws._alive = true
+      clearTimeout(ws._heartbeatTimer)
+    })
+
+    ws.on('message', (data) => {
+      let msg
+      try {
+        msg = JSON.parse(data)
+      } catch {
+        return
+      }
+
+      switch (msg.action) {
+        case 'CREATE_ROOM':  handleCreateRoom(ws, msg);          break
+        case 'JOIN_ROOM':    handleJoinRoom(ws, msg);             break
+        case 'RELAY':        handleRelay(ws, msg);                break
+        case 'RELAY_TO':     handleRelayTo(ws, msg);              break
+        case 'CLOSE_ROOM':   handleCloseRoom(ws);                 break
+        case 'PING':         send(ws, { action: 'PONG' });        break
+      }
+    })
+
+    ws.on('close', () => handleClose(ws))
+    ws.on('error', () => handleClose(ws))
+  })
+}
+
+/**
+ * Create a relay server instance. Exposed as a factory so tests can spin up
+ * isolated servers on random ports without racing on the global one.
+ */
+export function createServer({
+  port = WS_PORT,
+  allowedOrigins = WS_ALLOWED_ORIGINS,
+  hostGracePeriod = DEFAULT_HOST_GRACE_PERIOD,
+} = {}) {
+  HOST_GRACE_PERIOD = hostGracePeriod
+  const wss = new WebSocketServer({
+    port,
+    verifyClient: ({ origin }, cb) => {
+      if (allowedOrigins === '*' || !origin) return cb(true)
+      const allowed = allowedOrigins.split(',').map(o => o.trim())
+      cb(allowed.includes(origin), 403, 'Forbidden')
+    },
   })
 
-  ws.on('message', (data) => {
-    let msg
-    try {
-      msg = JSON.parse(data)
-    } catch {
-      return
-    }
+  setupConnectionHandler(wss)
+  const heartbeatTimer = startHeartbeat(wss)
 
-    switch (msg.action) {
-      case 'CREATE_ROOM':  handleCreateRoom(ws, msg);          break
-      case 'JOIN_ROOM':    handleJoinRoom(ws, msg);             break
-      case 'RELAY':        handleRelay(ws, msg);                break
-      case 'RELAY_TO':     handleRelayTo(ws, msg);              break
-      case 'CLOSE_ROOM':   handleCloseRoom(ws);                 break
-      case 'PING':         send(ws, { action: 'PONG' });        break
-    }
-  })
+  return {
+    wss,
+    get address() { return wss.address() },
+    close() {
+      clearInterval(heartbeatTimer)
+      return new Promise((resolve) => {
+        for (const client of wss.clients) {
+          try { client.terminate() } catch {}
+        }
+        wss.close(() => resolve())
+      })
+    },
+  }
+}
 
-  ws.on('close', () => handleClose(ws))
-  ws.on('error', () => handleClose(ws))
-})
+// CLI bootstrap — only when this file is the entrypoint, not when imported.
+const isEntrypoint = import.meta.url === `file://${process.argv[1]}`
+  || import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`
 
-startHeartbeat(wss)
-
-console.log(`nsf-timer relay server listening on ws://localhost:${WS_PORT}`)
+if (isEntrypoint) {
+  createServer()
+  console.log(`nsf-timer relay server listening on ws://localhost:${WS_PORT}`)
+}
