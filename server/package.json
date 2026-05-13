@@ -7,6 +7,6 @@
     "dev": "node --env-file-if-exists=../.env --watch index.js"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.20.1"
   }
 }
