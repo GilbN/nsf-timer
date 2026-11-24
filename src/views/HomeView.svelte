@@ -2,9 +2,7 @@
   import { onMount } from 'svelte'
   import { currentView, roomState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
-  import { SocketHost } from '../lib/peer/SocketHost.js'
-  import { SocketClient } from '../lib/peer/SocketClient.js'
-  import { TimerScheduler } from '../lib/timer/TimerScheduler.js'
+  import { hostRoom, joinRoom as joinSessionRoom, startScheduler } from '../lib/session.js'
   import { unlockAudio } from '../lib/audio.js'
   import { saveRoomState, loadRoomHistory, clearRoomHistory } from '../lib/storage.js'
   import SettingsMenu from '../components/SettingsMenu.svelte'
@@ -33,10 +31,8 @@
     error = ''
     connecting = true
     try {
-      const host = new SocketHost()
-      const code = await host.createRoom()
-      window.__nsfHost = host
-      saveRoomState({ code, isHost: true })
+      const host = await hostRoom()
+      saveRoomState({ code: host.code, isHost: true, hostToken: host.hostToken })
       currentView.set('lobby')
     } catch (e) {
       error = e.message || 'Failed to create room'
@@ -62,10 +58,8 @@
     error = ''
     connecting = true
     try {
-      const client = new SocketClient()
-      window.__nsfClient = client
-      const code = await client.joinRoom(joinCode.trim(), { name: joinName.trim(), lane: joinLane.trim() })
-      saveRoomState({ code, isHost: false, name: joinName.trim(), lane: joinLane.trim() })
+      const client = await joinSessionRoom(joinCode.trim(), { name: joinName.trim(), lane: joinLane.trim() })
+      saveRoomState({ code: client.code, isHost: false, name: joinName.trim(), lane: joinLane.trim() })
       currentView.set('timer')
     } catch (e) {
       if (e.message === 'laneRejected') {
@@ -73,8 +67,6 @@
       } else {
         error = e.message || 'Failed to join room'
       }
-      try { window.__nsfClient?.destroy() } catch {}
-      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -86,38 +78,23 @@
     connecting = true
     try {
       if (room.isHost) {
-        const host = new SocketHost()
-        await host.createRoom(room.code)
-        window.__nsfHost = host
-        saveRoomState({ code: room.code, isHost: true, programId: room.programId })
+        const host = await hostRoom(room.code, room.hostToken ?? null)
+        saveRoomState({ code: room.code, isHost: true, hostToken: host.hostToken, programId: room.programId })
         if (room.programId) {
-          const scheduler = new TimerScheduler()
-          scheduler.loadProgram(room.programId)
-          window.__nsfScheduler = scheduler
-          scheduler.onStateChange((state) => {
-            host.broadcastState(state)
-          })
+          startScheduler(room.programId)
         }
         currentView.set(room.programId ? 'timer' : 'lobby')
       } else if (room.isSpectator) {
-        const client = new SocketClient()
-        window.__nsfClient = client
-        await client.joinRoom(room.code, { role: 'spectator' })
+        await joinSessionRoom(room.code, { role: 'spectator' })
         saveRoomState({ code: room.code, isHost: false, isSpectator: true })
         currentView.set('display')
       } else {
-        const client = new SocketClient()
-        window.__nsfClient = client
-        await client.joinRoom(room.code, { name: room.name || '', lane: room.lane || '' })
+        await joinSessionRoom(room.code, { name: room.name || '', lane: room.lane || '' })
         saveRoomState({ code: room.code, isHost: false, name: room.name, lane: room.lane })
         currentView.set('timer')
       }
     } catch (e) {
       error = e.message || 'Failed to rejoin room'
-      try { window.__nsfHost?.destroy() } catch {}
-      try { window.__nsfClient?.destroy() } catch {}
-      window.__nsfHost = null
-      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -133,15 +110,11 @@
     error = ''
     connecting = true
     try {
-      const client = new SocketClient()
-      window.__nsfClient = client
-      await client.joinRoom(code, { role: 'spectator' })
+      await joinSessionRoom(code, { role: 'spectator' })
       saveRoomState({ code, isHost: false, isSpectator: true })
       currentView.set('display')
     } catch (e) {
       error = e.message || 'Failed to join room'
-      try { client.destroy() } catch {}
-      window.__nsfClient = null
     } finally {
       connecting = false
     }
@@ -357,7 +330,7 @@
         <button class="btn-ghost-sm" onclick={handleClearHistory}>{$t('clear')}</button>
       </div>
       <div class="recent-list">
-        {#each recentRooms as room}
+        {#each recentRooms as room (room.code)}
           <button class="recent-room-card" onclick={() => rejoinRoom(room)} disabled={connecting}>
             <span class="recent-code">{room.code}</span>
             <span class="recent-meta">

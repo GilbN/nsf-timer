@@ -7,7 +7,7 @@ export function setSoundEnabled(enabled) {
 
 function getAudioContext() {
   if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    audioContext = new (window.AudioContext || /** @type {typeof AudioContext} */ (window.webkitAudioContext))()
   }
   if (audioContext.state === 'suspended') {
     audioContext.resume()

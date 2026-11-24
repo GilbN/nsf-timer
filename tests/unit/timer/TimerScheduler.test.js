@@ -523,6 +523,32 @@ describe('TimerScheduler', () => {
   })
 
   describe('restoreState', () => {
+    it('broadcasts the restored state so clients leave the idle snapshot from loadProgram', () => {
+      vi.setSystemTime(new Date('2026-04-17T10:00:00Z'))
+      const received = []
+      scheduler.onStateChange((state) => received.push(state))
+      scheduler.loadProgram('standard')
+      scheduler.restoreState({
+        phase: 'loading',
+        programId: 'standard',
+        stageIndex: 1,
+        exerciseIndex: 0,
+        seriesIndex: 0,
+        phaseStartedAt: Date.parse('2026-04-17T09:59:50Z'),
+        totalMs: 60_000,
+        remainingMs: 60_000,
+        targetVisible: false,
+      })
+      expect(received.at(-1)).toMatchObject({ phase: 'loading', stageIndex: 1, remainingMs: 50_000 })
+    })
+
+    it('broadcasts a restored stopped state', () => {
+      const received = []
+      scheduler.onStateChange((state) => received.push(state))
+      scheduler.restoreState({ phase: 'stopped', programId: 'standard', stageIndex: 2, exerciseIndex: 0, seriesIndex: 1, remainingMs: 0, totalMs: 0, targetVisible: false })
+      expect(received.at(-1)).toMatchObject({ phase: 'stopped', stageIndex: 2 })
+    })
+
     it('restores a stopped state as-is', () => {
       const saved = {
         phase: 'stopped',
@@ -632,6 +658,42 @@ describe('TimerScheduler', () => {
       // Mutating the received state shouldn't affect the scheduler
       received[0].phase = 'mutated'
       expect(scheduler.state.phase).toBe('idle')
+    })
+  })
+
+  describe('per-second updates', () => {
+    it('updates the store and calls onTick once per displayed second, not every frame', () => {
+      scheduler.loadProgram('standard')
+      const stateChanges = vi.fn()
+      const ticks = []
+      scheduler.onStateChange(stateChanges)
+      scheduler.onTick((tick) => ticks.push(tick))
+      let storeUpdates = 0
+      const unsubscribe = timerState.subscribe(() => { storeUpdates++ })
+      storeUpdates = 0
+
+      scheduler.startSeries() // loading phase starts
+      const changesAfterStart = stateChanges.mock.calls.length
+      vi.advanceTimersByTime(5000)
+      unsubscribe()
+
+      // Five seconds of ~16ms frames is ~300 engine ticks; only the second
+      // boundaries should reach the store and the network.
+      expect(ticks.length).toBeGreaterThanOrEqual(4)
+      expect(ticks.length).toBeLessThanOrEqual(6)
+      expect(storeUpdates).toBeLessThanOrEqual(changesAfterStart + 6)
+      expect(stateChanges.mock.calls.length).toBe(changesAfterStart)
+      expect(ticks.at(-1)).toEqual({ remainingMs: expect.any(Number), targetVisible: false })
+      expect(Math.ceil(get(timerState).remainingMs / 1000)).toBe(Math.ceil(scheduler.state.remainingMs / 1000))
+    })
+
+    it('captures the exact remaining time when paused', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      vi.advanceTimersByTime(1234)
+      scheduler.pause()
+      expect(get(timerState).phase).toBe('paused')
+      expect(get(timerState).remainingMs).toBe(scheduler.engine.remainingMs)
     })
   })
 })

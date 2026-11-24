@@ -1,33 +1,28 @@
 <script>
   import { get } from 'svelte/store'
-  import { currentView, roomState, timerState } from '../lib/stores.js'
+  import { currentView, roomState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
-  import { TimerScheduler } from '../lib/timer/TimerScheduler.js'
-  import { saveRoomState, clearRoomState, addRoomToHistory } from '../lib/storage.js'
+  import { confirmAction } from '../lib/confirm.js'
+  import { saveRoomState } from '../lib/storage.js'
+  import { session, startScheduler, rememberRoom, endSession } from '../lib/session.js'
   import RoomCode from '../components/RoomCode.svelte'
   import ConnectionStatus from '../components/ConnectionStatus.svelte'
   import ProgramPicker from '../components/ProgramPicker.svelte'
   import ProgramEditor from '../components/ProgramEditor.svelte'
-  import LangToggle from '../components/LangToggle.svelte'
   import SettingsMenu from '../components/SettingsMenu.svelte'
 
   let showEditor = $state(false)
   let editingProgram = $state(null)
 
   function selectProgram(programId) {
-    const scheduler = new TimerScheduler()
-    window.__nsfScheduler = scheduler
-
-    const host = window.__nsfHost
-    if (host) {
-      scheduler.onStateChange((state) => {
-        host.broadcastState(state)
-      })
-    }
-
-    scheduler.loadProgram(programId)
-
-    saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo, programId })
+    startScheduler(programId)
+    saveRoomState({
+      code: $roomState.code,
+      isHost: true,
+      isSolo: $roomState.isSolo,
+      hostToken: session.host?.hostToken,
+      programId,
+    })
     currentView.set('timer')
   }
 
@@ -45,18 +40,10 @@
     showEditor = true
   }
 
-  function disconnect() {
-    if (!confirm(get(t)('confirmDisconnect'))) return
-    if ($roomState.code && !$roomState.isSolo) {
-      addRoomToHistory({ code: $roomState.code, isHost: true })
-    }
-    if (window.__nsfHost) {
-      window.__nsfHost.destroy()
-      window.__nsfHost = null
-    }
-    clearRoomState()
-    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
-    currentView.set('home')
+  async function disconnect() {
+    if (!(await confirmAction(get(t)('confirmDisconnect'), get(t)('disconnect')))) return
+    rememberRoom()
+    endSession()
   }
 </script>
 
@@ -66,7 +53,7 @@
       <div class="solo-badge">{$t('soloMode')}</div>
     {:else}
       <div class="top-bar-left">
-        <RoomCode code={$roomState.code} />
+        <RoomCode code={$roomState.code ?? ''} />
         <ConnectionStatus status="connected" />
       </div>
     {/if}

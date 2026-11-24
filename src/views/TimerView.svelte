@@ -2,8 +2,10 @@
   import { get } from 'svelte/store'
   import { currentView, roomState, timerState, preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
+  import { confirmAction } from '../lib/confirm.js'
   import { getProgramById } from '../lib/programs/registry.js'
-  import { saveTimerState, saveRoomState, clearTimerState, clearRoomState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
+  import { saveTimerState, saveRoomState, clearTimerState } from '../lib/storage.js'
+  import { session, stopScheduler, rememberRoom, endSession } from '../lib/session.js'
   import { setSoundEnabled, beepStart, beepStop, beepTargetUp, beepTargetDown } from '../lib/audio.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
@@ -17,10 +19,9 @@
 
   // Capture role at mount time so it's stable even if roomState changes on disconnect
   const initialIsHost = get(roomState).isHost
-  const initialIsClient = !initialIsHost && (!!get(roomState).code || !!window.__nsfClient)
+  const initialIsClient = !initialIsHost && (!!get(roomState).code || !!session.client)
   let isHost = $derived($roomState.isHost || initialIsHost)
   let program = $derived(getProgramById($timerState.programId))
-  let stage = $derived(program?.stages[$timerState.stageIndex])
   let hasNextStage = $derived(program && $timerState.stageIndex < program.stages.length - 1)
   let connectionStatus = $state('connected')
 
@@ -61,7 +62,7 @@
 
   // Client connection status handling
   $effect(() => {
-    const client = window.__nsfClient
+    const client = session.client
     if (client) {
       client.onStatusChange((status) => {
         if (status === 'connected') {
@@ -77,14 +78,15 @@
     }
   })
 
-  function shouldHoldWakeLock() {
-    const phase = $timerState.phase
-    return $preferences.wakeLockEnabled || phase === 'loading' || phase === 'shooting'
-  }
+  // Derived so the effects below only re-run when the answer changes,
+  // not on every timer update.
+  let holdWakeLock = $derived(
+    $preferences.wakeLockEnabled || $timerState.phase === 'loading' || $timerState.phase === 'shooting'
+  )
 
   // Effect: acquire/release based on phase or manual toggle
   $effect(() => {
-    if (shouldHoldWakeLock()) {
+    if (holdWakeLock) {
       acquireWakeLock()
     } else {
       releaseWakeLock()
@@ -94,7 +96,7 @@
   // Effect: re-acquire after OS revocation (battery saver, interruption)
   $effect(() => {
     function onVisibilityChange() {
-      if (document.visibilityState === 'visible' && shouldHoldWakeLock()) {
+      if (document.visibilityState === 'visible' && holdWakeLock) {
         acquireWakeLock()
       }
     }
@@ -105,27 +107,27 @@
     }
   })
 
-  function handleStart() { window.__nsfScheduler?.startSeries() }
-  function handleRestart() { window.__nsfScheduler?.restartSeries() }
-  function handleNextSeries() { window.__nsfScheduler?.nextSeries() }
-  function handlePause() { window.__nsfScheduler?.pause() }
-  function handleResume() { window.__nsfScheduler?.resume() }
-  function handleStop() { window.__nsfScheduler?.stop() }
-  function handleNext() { window.__nsfScheduler?.nextExercise() }
+  function handleStart() { session.scheduler?.startSeries() }
+  function handleRestart() { session.scheduler?.restartSeries() }
+  function handleNextSeries() { session.scheduler?.nextSeries() }
+  function handlePause() { session.scheduler?.pause() }
+  function handleResume() { session.scheduler?.resume() }
+  function handleStop() { session.scheduler?.stop() }
+  function handleNext() { session.scheduler?.nextExercise() }
 
   let showJumpModal = $state(false)
   let showPeerModal = $state(false)
 
-  function handleReset() {
-    if (!confirm(get(t)('confirmReset'))) return
-    window.__nsfScheduler?.reset()
-    window.__nsfHost?.resetAllJams()
+  async function handleReset() {
+    if (!(await confirmAction(get(t)('confirmReset'), get(t)('reset')))) return
+    session.scheduler?.reset()
+    session.host?.resetAllJams()
     clearTimerState()
   }
 
   function handleReshoot(peer) {
-    const host = window.__nsfHost
-    const scheduler = window.__nsfScheduler
+    const host = session.host
+    const scheduler = session.scheduler
     if (!host || !scheduler) return
 
     const stageKey = scheduler.getCurrentStageKey()
@@ -136,46 +138,19 @@
     scheduler.startReshoot(label)
   }
 
-  function changeProgram() {
-    if (!confirm(get(t)('confirmChangeProgram'))) return
-    if (window.__nsfScheduler) {
-      window.__nsfScheduler.destroy()
-      window.__nsfScheduler = null
-    }
-    window.__nsfHost?.resetAllJams()
+  async function changeProgram() {
+    if (!(await confirmAction(get(t)('confirmChangeProgram'), get(t)('changeProgram')))) return
+    stopScheduler()
+    session.host?.resetAllJams()
     clearTimerState()
-    saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo })
+    saveRoomState({ code: $roomState.code, isHost: true, isSolo: $roomState.isSolo, hostToken: session.host?.hostToken })
     currentView.set('lobby')
   }
 
-  function disconnect() {
-    if (!confirm(get(t)('confirmDisconnect'))) return
-    if ($roomState.code) {
-      const savedRoom = loadRoomState()
-      addRoomToHistory({
-        code: $roomState.code,
-        isHost: $roomState.isHost,
-        programId: $timerState.programId,
-        name: savedRoom?.name,
-        lane: savedRoom?.lane,
-      })
-    }
-    if (window.__nsfScheduler) {
-      window.__nsfScheduler.destroy()
-      window.__nsfScheduler = null
-    }
-    if (window.__nsfHost) {
-      window.__nsfHost.destroy()
-      window.__nsfHost = null
-    }
-    if (window.__nsfClient) {
-      window.__nsfClient.destroy()
-      window.__nsfClient = null
-    }
-    clearTimerState()
-    clearRoomState()
-    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
-    currentView.set('home')
+  async function disconnect() {
+    if (!(await confirmAction(get(t)('confirmDisconnect'), get(t)('disconnect')))) return
+    rememberRoom({ programId: $timerState.programId })
+    endSession()
   }
 </script>
 
@@ -185,7 +160,7 @@
     {#if $roomState.isSolo}
       <div class="solo-badge">{$t('soloMode')}</div>
     {:else if $roomState.code}
-      <RoomCode code={$roomState.code} />
+      <RoomCode code={$roomState.code ?? ''} />
     {/if}
     {#if initialIsClient}
       <ConnectionStatus status={connectionStatus} variant="dot" />

@@ -1,9 +1,7 @@
 <script>
-  import { currentView, preferences, roomState, timerState } from './lib/stores.js'
+  import { currentView, preferences, roomState } from './lib/stores.js'
   import { loadPreferences, loadRoomState, loadTimerState, clearRoomState, clearTimerState } from './lib/storage.js'
-  import { SocketHost } from './lib/peer/SocketHost.js'
-  import { SocketClient } from './lib/peer/SocketClient.js'
-  import { TimerScheduler } from './lib/timer/TimerScheduler.js'
+  import { session, hostRoom, joinRoom, startScheduler } from './lib/session.js'
   import { registerUpdateHandler } from './lib/updateAvailable.js'
   import HomeView from './views/HomeView.svelte'
   import LobbyView from './views/LobbyView.svelte'
@@ -11,6 +9,7 @@
   import StopwatchView from './views/StopwatchView.svelte'
   import DisplayView from './views/DisplayView.svelte'
   import UpdateModal from './components/UpdateModal.svelte'
+  import ConfirmDialog from './components/ConfirmDialog.svelte'
 
   // Restore preferences on load
   const savedPrefs = loadPreferences()
@@ -35,71 +34,37 @@
     if (!savedRoom?.code && !savedRoom?.isSolo) return
 
     try {
-      if (savedRoom.isSolo) {
-        // Solo mode: restore without any WebSocket
-        roomState.set({ code: null, isHost: true, isSolo: true, connectedPeers: [] })
-        const savedTimer = loadTimerState()
-        if (savedTimer?.programId || savedRoom.programId) {
-          const scheduler = new TimerScheduler()
-          window.__nsfScheduler = scheduler
-          if (savedTimer?.programId) {
-            scheduler.loadProgram(savedTimer.programId)
-            scheduler.restoreState(savedTimer)
-          } else {
-            scheduler.loadProgram(savedRoom.programId)
-          }
-          currentView.set('timer')
+      if (savedRoom.isSolo || savedRoom.isHost) {
+        if (savedRoom.isSolo) {
+          // Solo mode: restore without any WebSocket
+          roomState.set({ code: null, isHost: true, isSolo: true, connectedPeers: [] })
         } else {
-          currentView.set('lobby')
+          // Host reload: reclaim the same room code
+          await hostRoom(savedRoom.code, savedRoom.hostToken ?? null)
         }
-      } else if (savedRoom.isHost) {
-        // Host reload: reclaim the same room code
-        const host = new SocketHost()
-        await host.createRoom(savedRoom.code)
-        window.__nsfHost = host
-
         // Restore timer state if a program was active
         const savedTimer = loadTimerState()
         if (savedTimer?.programId || savedRoom.programId) {
-          const scheduler = new TimerScheduler()
-          window.__nsfScheduler = scheduler
-
-          // Wire up broadcasting before loading so initial state is sent
-          scheduler.onStateChange((state) => {
-            host.broadcastState(state)
-          })
-
-          if (savedTimer?.programId) {
-            scheduler.loadProgram(savedTimer.programId)
-            scheduler.restoreState(savedTimer)
-          } else {
-            scheduler.loadProgram(savedRoom.programId)
-          }
-
+          startScheduler(savedRoom.programId, savedTimer)
           currentView.set('timer')
         } else {
-          // Host was in lobby (no program selected yet)
           currentView.set('lobby')
         }
       } else if (savedRoom.isSpectator) {
         // Display/spectator reload: reconnect as spectator
-        const client = new SocketClient()
-        window.__nsfClient = client
-        await client.joinRoom(savedRoom.code, { role: 'spectator' })
+        await joinRoom(savedRoom.code, { role: 'spectator' })
         currentView.set('display')
       } else {
         // Client reload: reconnect to the same room
-        const client = new SocketClient()
-        window.__nsfClient = client
-        await client.joinRoom(savedRoom.code, { name: savedRoom.name || '', lane: savedRoom.lane || '' })
+        await joinRoom(savedRoom.code, { name: savedRoom.name || '', lane: savedRoom.lane || '' })
         currentView.set('timer')
       }
     } catch {
-      // Reconnection failed — clean up and go home
+      // Reconnection failed: clean up and go home
       clearRoomState()
       clearTimerState()
-      window.__nsfHost = null
-      window.__nsfClient = null
+      session.host = null
+      session.client = null
     }
   }
 </script>
@@ -117,3 +82,4 @@
 {/if}
 
 <UpdateModal />
+<ConfirmDialog />

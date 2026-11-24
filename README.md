@@ -160,6 +160,8 @@ Traefik handles WebSocket upgrades automatically.
 
 ## Getting started
 
+Requires Node.js 24 or newer.
+
 ```bash
 npm install
 npm run dev

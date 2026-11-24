@@ -1,5 +1,5 @@
 <script>
-  import { currentView, timerState, formattedTime, preferences } from '../lib/stores.js'
+  import { currentView, timerState, preferences } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import { TimerEngine } from '../lib/timer/TimerEngine.js'
   import SettingsMenu from '../components/SettingsMenu.svelte'
@@ -132,8 +132,8 @@
               min="0"
               max="99"
               bind:value={inputMin}
-              onfocus={(e) => e.target.select()}
-              oninput={(e) => { inputMin = Math.min(99, Math.max(0, parseInt(e.target.value) || 0)) }}
+              onfocus={(e) => e.currentTarget.select()}
+              oninput={(e) => { inputMin = Math.min(99, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
             />
             <button class="editor-btn" onclick={() => changeMin(-1)}>▼</button>
           </div>
@@ -146,8 +146,8 @@
               min="0"
               max="59"
               bind:value={inputSec}
-              onfocus={(e) => e.target.select()}
-              oninput={(e) => { inputSec = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) }}
+              onfocus={(e) => e.currentTarget.select()}
+              oninput={(e) => { inputSec = Math.min(59, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
             />
             <button class="editor-btn" onclick={() => changeSec(-1)}>▼</button>
           </div>
@@ -398,6 +398,7 @@
     color: var(--text-primary);
     text-align: center;
     -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   .editor-input::-webkit-outer-spin-button,

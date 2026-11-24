@@ -116,11 +116,11 @@
     <input type="text" bind:value={name} placeholder={$t('programName')} />
   </label>
 
-  {#each stages as ds, dsIdx}
+  {#each stages as ds, dsIdx (dsIdx)}
     <div class="stage-block">
       <div class="stage-header">
         <input type="text" bind:value={ds.name.no} placeholder={$t('stageName')} />
-        <select value={ds.type} onchange={(e) => updateType(dsIdx, e.target.value)}>
+        <select value={ds.type} onchange={(e) => updateType(dsIdx, e.currentTarget.value)}>
           <option value="precision">{$t('precision')}</option>
           <option value="rapid">{$t('rapid')}</option>
           <option value="duell">{$t('duell')}</option>
@@ -130,7 +130,7 @@
         {/if}
       </div>
 
-      {#each ds.exercises as ex, exIdx}
+      {#each ds.exercises as ex, exIdx (exIdx)}
         <div class="exercise-block">
           {#if ds.exercises.length > 1}
             <button

@@ -35,7 +35,8 @@ export default defineConfig(({ command, mode }) => {
         theme_color: '#0d0d1a',
         background_color: '#0d0d1a',
         display: 'standalone',
-        orientation: 'portrait',
+        // 'any' so the display view can use its landscape layout on tablets and TVs
+        orientation: 'any',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -43,7 +44,12 @@ export default defineConfig(({ command, mode }) => {
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg}'],
+        globPatterns: [
+          '**/*.{js,css,html,png,svg,ico,webp}',
+          // Only the Latin font subsets; other scripts load on demand.
+          '**/*-latin-wght-normal-*.woff2',
+          '**/*-latin-ext-wght-normal-*.woff2',
+        ],
       },
     }),
   ],

@@ -47,6 +47,29 @@ describe('relay server — message fan-out', () => {
       await host.ws.close()
     })
 
+    it('folds TICK updates into the cached STATE_SYNC', async () => {
+      const host = await createHost(server.url)
+      host.ws.send({ action: 'RELAY', message: { type: 'STATE_SYNC', payload: { phase: 'loading', remainingMs: 60_000, targetVisible: false }, ts: 1 } })
+      host.ws.send({ action: 'RELAY', message: { type: 'TICK', payload: { remainingMs: 12_000, targetVisible: false }, ts: 2 } })
+      await new Promise(r => setTimeout(r, 50))
+
+      const late = await joinClient(server.url, host.code, { role: 'spectator' })
+      const cached = await late.ws.waitFor('CACHED_STATE')
+      expect(cached.message.type).toBe('STATE_SYNC')
+      expect(cached.message.payload).toEqual({ phase: 'loading', remainingMs: 12_000, targetVisible: false })
+
+      await late.ws.close()
+      await host.ws.close()
+    })
+
+    it('does not tell the host when a spectator leaves', async () => {
+      const host = await createHost(server.url)
+      const display = await joinClient(server.url, host.code, { role: 'spectator' })
+      await display.ws.close()
+      await expect(host.ws.next(200)).rejects.toThrow(/Timed out/)
+      await host.ws.close()
+    })
+
     it('does not cache non-STATE_SYNC messages', async () => {
       const host = await createHost(server.url)
       host.ws.send({ action: 'RELAY', message: { type: 'BEEP', payload: {}, ts: 1 } })

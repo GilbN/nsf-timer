@@ -1,17 +1,40 @@
-let wakeLock = null
+let sentinel = null
+let pending = null
+let wanted = false
 
+/**
+ * Keep the screen on. Safe to call repeatedly: it holds at most one lock and
+ * only asks the browser again after the OS released the previous one (for
+ * example when the tab was hidden).
+ */
 export async function acquireWakeLock() {
+  wanted = true
   if (!('wakeLock' in navigator)) return
-  try {
-    wakeLock = await navigator.wakeLock.request('screen')
-  } catch {
-    // Denied or not available — ignore
-  }
+  if (sentinel && !sentinel.released) return
+  if (pending) return pending
+
+  pending = navigator.wakeLock.request('screen')
+    .then((lock) => {
+      if (wanted) {
+        sentinel = lock
+      } else {
+        // Released while the request was in flight.
+        lock.release().catch(() => {})
+      }
+    })
+    .catch(() => {
+      // Denied or not available; ignore
+    })
+    .finally(() => {
+      pending = null
+    })
+  return pending
 }
 
 export function releaseWakeLock() {
-  if (wakeLock) {
-    wakeLock.release().catch(() => {})
-    wakeLock = null
+  wanted = false
+  if (sentinel) {
+    sentinel.release().catch(() => {})
+    sentinel = null
   }
 }

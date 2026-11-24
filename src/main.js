@@ -1,3 +1,6 @@
+// Self-hosted so the PWA keeps its fonts offline
+import '@fontsource-variable/inter/wght.css'
+import '@fontsource-variable/jetbrains-mono/wght.css'
 import './styles/global.css'
 import App from './App.svelte'
 import { mount } from 'svelte'
@@ -9,6 +12,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   window.__pwaInstallPrompt = e
 })
 
-const app = mount(App, { target: document.getElementById('app') })
+const app = mount(App, { target: /** @type {HTMLElement} */ (document.getElementById('app')) })
 
 export default app

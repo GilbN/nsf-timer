@@ -1,28 +1,17 @@
 <script>
   import { roomState, timerState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
+  import Modal from './Modal.svelte'
 
   let { onReshoot, onClose } = $props()
 
   let peers = $derived($roomState.connectedPeers || [])
   let canReshoot = $derived($timerState.phase === 'stopped' || $timerState.phase === 'idle')
-  let panelEl = $state(null)
 
-  $effect(() => {
-    const previouslyFocused = document.activeElement
-    panelEl?.focus()
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
-    }
-  })
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onClose}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="peer-list-title" tabindex="-1" bind:this={panelEl} onclick={(e) => e.stopPropagation()}>
+<Modal {onClose} labelledby="peer-list-title">
+  <div class="modal-panel">
     <div class="modal-header">
       <h2 id="peer-list-title" class="modal-title">{$t('shooters')}</h2>
       <span class="peer-count">{peers.length}</span>
@@ -33,7 +22,7 @@
         <div class="empty">{$t('noPeers')}</div>
       {/if}
 
-      {#each peers as peer}
+      {#each peers as peer (peer.peerId)}
         <div class="peer-item">
           <span class="peer-lane">{peer.lane ? `#${peer.lane}` : '--'}</span>
           <span class="peer-name">{peer.name || $t('anonymous')}</span>
@@ -55,19 +44,9 @@
       <button class="btn-close" onclick={onClose}>{$t('back')}</button>
     </div>
   </div>
-</div>
+</Modal>
 
 <style>
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .modal-panel {
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.08);
