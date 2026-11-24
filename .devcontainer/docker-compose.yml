@@ -1,6 +1,6 @@
 services:
   app:
-    image: mcr.microsoft.com/devcontainers/javascript-node:22
+    image: mcr.microsoft.com/devcontainers/javascript-node:24
     volumes:
       - ..:/workspace:cached
       - /var/run/docker.sock:/var/run/docker.sock

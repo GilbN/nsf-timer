@@ -20,6 +20,7 @@ export async function startServer(opts = {}) {
   return {
     port,
     url: `ws://127.0.0.1:${port}`,
+    httpUrl: `http://127.0.0.1:${port}`,
     close: () => instance.close(),
   }
 }
@@ -71,7 +72,7 @@ function wrap(ws) {
 
     /**
      * Wait for the next message. Times out with a helpful error so a hung
-     * test doesn't just stall — it fails fast.
+     * test doesn't just stall; it fails fast.
      */
     next(timeoutMs = 1000) {
       return new Promise((resolve, reject) => {
@@ -128,15 +129,16 @@ export function randomCode() {
 
 /**
  * Promote a freshly connected socket to a host and wait for confirmation.
+ * Pass the hostToken from an earlier ROOM_CREATED to reclaim a room.
  */
-export async function createHost(url, code = randomCode()) {
+export async function createHost(url, code = randomCode(), hostToken) {
   const ws = await connect(url)
-  ws.send({ action: 'CREATE_ROOM', code })
+  ws.send({ action: 'CREATE_ROOM', code, hostToken })
   const ack = await ws.next()
   if (ack.action !== 'ROOM_CREATED') {
     throw new Error(`CREATE_ROOM failed: ${JSON.stringify(ack)}`)
   }
-  return { ws, code }
+  return { ws, code, hostToken: ack.hostToken }
 }
 
 /**

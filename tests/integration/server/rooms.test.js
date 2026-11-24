@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { startServer, connect, createHost, joinClient, randomCode } from './helpers.js'
 
-describe('relay server — rooms', () => {
+describe('relay server: rooms', () => {
   let server
 
   beforeAll(async () => { server = await startServer() })
@@ -17,6 +17,7 @@ describe('relay server — rooms', () => {
 
       expect(ack.action).toBe('ROOM_CREATED')
       expect(ack.code).toBe(code)
+      expect(ack.hostToken).toMatch(/^[0-9a-f-]{36}$/)
       await ws.close()
     })
 
@@ -52,6 +53,49 @@ describe('relay server — rooms', () => {
 
       await second.close()
       await first.ws.close()
+    })
+  })
+
+  describe('one room per socket', () => {
+    it('rejects CREATE_ROOM for a second code from a host', async () => {
+      const host = await createHost(server.url)
+      host.ws.send({ action: 'CREATE_ROOM', code: randomCode() })
+      expect(await host.ws.next()).toMatchObject({ action: 'ERROR', reason: 'already_in_room' })
+      await host.ws.close()
+    })
+
+    it('rejects JOIN_ROOM from a host', async () => {
+      const host = await createHost(server.url)
+      const other = await createHost(server.url)
+      host.ws.send({ action: 'JOIN_ROOM', code: other.code, name: 'X', lane: '1' })
+      expect(await host.ws.next()).toMatchObject({ action: 'ERROR', reason: 'already_in_room' })
+      await host.ws.close()
+      await other.ws.close()
+    })
+
+    it('rejects a second JOIN_ROOM or CREATE_ROOM from a client', async () => {
+      const host = await createHost(server.url)
+      const client = await joinClient(server.url, host.code, { name: 'A', lane: '1' })
+
+      client.ws.send({ action: 'JOIN_ROOM', code: host.code, name: 'A', lane: '2' })
+      expect(await client.ws.next()).toMatchObject({ action: 'ERROR', reason: 'already_in_room' })
+
+      client.ws.send({ action: 'CREATE_ROOM', code: randomCode() })
+      expect(await client.ws.next()).toMatchObject({ action: 'ERROR', reason: 'already_in_room' })
+
+      client.ws.send({ action: 'CREATE_ROOM', code: host.code, hostToken: host.hostToken })
+      expect(await client.ws.next()).toMatchObject({ action: 'ERROR', reason: 'already_in_room' })
+
+      await client.ws.close()
+      await host.ws.close()
+    })
+
+    it('lets a host create a new room after CLOSE_ROOM', async () => {
+      const host = await createHost(server.url)
+      host.ws.send({ action: 'CLOSE_ROOM' })
+      host.ws.send({ action: 'CREATE_ROOM', code: randomCode() })
+      expect(await host.ws.next()).toMatchObject({ action: 'ROOM_CREATED' })
+      await host.ws.close()
     })
   })
 
@@ -118,7 +162,7 @@ describe('relay server — rooms', () => {
         name: 'Watcher', lane: '1', role: 'spectator',
       })
 
-      // Brief window for any incidental PEER_JOINED — should not arrive
+      // Wait briefly. No PEER_JOINED should arrive
       await expect(host.ws.next(200)).rejects.toThrow(/Timed out/)
 
       await spectator.ws.close()
@@ -161,7 +205,7 @@ describe('relay server — rooms', () => {
       const closed = await client.ws.waitFor('RELAYED')
       expect(closed.message.type).toBe('ROOM_CLOSED')
 
-      // Trying to join again fails — room is gone
+      // Joining again fails because the room is gone
       await expect(joinClient(server.url, host.code))
         .rejects.toMatchObject({ reason: 'room_not_found' })
 
@@ -198,7 +242,7 @@ describe('relay server — rooms', () => {
     it('silently drops non-JSON frames instead of crashing', async () => {
       const ws = await connect(server.url)
       ws.raw.send('not json{{')
-      // Follow up with a valid PING — server should still be responsive
+      // Follow up with a valid PING; the server should still be responsive
       ws.send({ action: 'PING' })
       const pong = await ws.next()
       expect(pong.action).toBe('PONG')
@@ -208,7 +252,7 @@ describe('relay server — rooms', () => {
     it('ignores unknown actions without responding', async () => {
       const ws = await connect(server.url)
       ws.send({ action: 'NOT_A_REAL_ACTION' })
-      // No reply — follow up with PING proves the connection is still live
+      // No reply. A follow up with PING proves the connection is still live
       ws.send({ action: 'PING' })
       const reply = await ws.next()
       expect(reply.action).toBe('PONG')

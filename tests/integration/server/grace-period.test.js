@@ -8,7 +8,7 @@ import { startServer, createHost, joinClient, connect } from './helpers.js'
 // flake the "host can still reclaim" test.
 const GRACE_MS = 250
 
-describe('relay server — host grace period', () => {
+describe('relay server: host grace period', () => {
   let server
 
   beforeAll(async () => { server = await startServer({ hostGracePeriod: GRACE_MS }) })
@@ -37,11 +37,12 @@ describe('relay server — host grace period', () => {
     await host.ws.close()
     await client.ws.waitFor('HOST_DISCONNECTED')
 
-    // Reclaim the same code with a fresh socket — inside the grace window
+    // Reclaim the same code with a fresh socket inside the grace window
     const reclaim = await connect(server.url)
-    reclaim.send({ action: 'CREATE_ROOM', code: host.code })
+    reclaim.send({ action: 'CREATE_ROOM', code: host.code, hostToken: host.hostToken })
     const ack = await reclaim.next()
     expect(ack.action).toBe('ROOM_CREATED')
+    expect(ack.hostToken).toBe(host.hostToken)
 
     // Host should receive a PEERS_SNAPSHOT with the still-connected client
     const snapshot = await reclaim.waitFor('PEERS_SNAPSHOT')
@@ -70,13 +71,13 @@ describe('relay server — host grace period', () => {
     const closed = await client.ws.waitFor('RELAYED', GRACE_MS + 500)
     expect(closed.message.type).toBe('ROOM_CLOSED')
 
-    // Reclaim attempts should now fail — room is gone
+    // The room is gone, so the code is free again and CREATE_ROOM makes a
+    // new room with a new token, even when the old token is sent.
     const late = await connect(server.url)
-    late.send({ action: 'CREATE_ROOM', code: host.code })
+    late.send({ action: 'CREATE_ROOM', code: host.code, hostToken: host.hostToken })
     const ack = await late.next()
-    // Since the room is gone, CREATE_ROOM on that code should succeed as a new room.
-    // That's actually the intended behavior — the code is free again.
     expect(ack.action).toBe('ROOM_CREATED')
+    expect(ack.hostToken).not.toBe(host.hostToken)
 
     await late.close()
     await client.ws.close()
@@ -95,6 +96,62 @@ describe('relay server — host grace period', () => {
     await host.ws.close()
   })
 
+  it('rejects a reclaim with a missing or wrong hostToken', async () => {
+    const host = await createHost(server.url)
+    const client = await joinClient(server.url, host.code, { name: 'A', lane: '1' })
+    await host.ws.waitFor('PEER_JOINED')
+
+    await host.ws.close()
+    await client.ws.waitFor('HOST_DISCONNECTED')
+
+    const noToken = await connect(server.url)
+    noToken.send({ action: 'CREATE_ROOM', code: host.code })
+    expect(await noToken.next()).toMatchObject({ action: 'ERROR', reason: 'code_taken' })
+
+    const wrongToken = await connect(server.url)
+    wrongToken.send({ action: 'CREATE_ROOM', code: host.code, hostToken: 'not-the-token' })
+    expect(await wrongToken.next()).toMatchObject({ action: 'ERROR', reason: 'code_taken' })
+
+    // The room is still waiting for its real host
+    const reclaim = await createHost(server.url, host.code, host.hostToken)
+    await client.ws.waitFor('HOST_RECONNECTED')
+
+    await noToken.close()
+    await wrongToken.close()
+    await reclaim.ws.close()
+    await client.ws.close()
+  })
+
+  it('lets the right token reclaim while the old host socket is still open', async () => {
+    const host = await createHost(server.url)
+    const client = await joinClient(server.url, host.code, { name: 'Alice', lane: '1' })
+    await host.ws.waitFor('PEER_JOINED')
+
+    const oldClosed = new Promise((resolve) => host.ws.raw.once('close', (code) => resolve(code)))
+
+    // Skip the close. A page reload can beat the old socket's close
+    const reclaim = await connect(server.url)
+    reclaim.send({ action: 'CREATE_ROOM', code: host.code, hostToken: host.hostToken })
+    const ack = await reclaim.next()
+    expect(ack).toMatchObject({ action: 'ROOM_CREATED', code: host.code, hostToken: host.hostToken })
+    const snapshot = await reclaim.waitFor('PEERS_SNAPSHOT')
+    expect(snapshot.peers).toEqual([{ peerId: client.peerId, name: 'Alice', lane: '1' }])
+    await client.ws.waitFor('HOST_RECONNECTED')
+
+    // The server closes the replaced socket with 4001
+    expect(await oldClosed).toBe(4001)
+
+    // Its close must not start a grace period. The client gets no
+    // HOST_DISCONNECTED, and traffic from the new host still reaches it.
+    await expect(client.ws.next(GRACE_MS + 200)).rejects.toThrow(/Timed out/)
+    reclaim.send({ action: 'RELAY', message: { type: 'PING_TEST' } })
+    const relayed = await client.ws.waitFor('RELAYED')
+    expect(relayed.message.type).toBe('PING_TEST')
+
+    await reclaim.close()
+    await client.ws.close()
+  })
+
   it('excludes spectators from the PEERS_SNAPSHOT on reclaim', async () => {
     const host = await createHost(server.url)
     const player = await joinClient(server.url, host.code, { name: 'P', lane: '1' })
@@ -107,7 +164,7 @@ describe('relay server — host grace period', () => {
     await player.ws.waitFor('HOST_DISCONNECTED')
 
     const reclaim = await connect(server.url)
-    reclaim.send({ action: 'CREATE_ROOM', code: host.code })
+    reclaim.send({ action: 'CREATE_ROOM', code: host.code, hostToken: host.hostToken })
     await reclaim.waitFor('ROOM_CREATED')
     const snapshot = await reclaim.waitFor('PEERS_SNAPSHOT')
 
