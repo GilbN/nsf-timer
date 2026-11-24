@@ -871,6 +871,35 @@ describe('TimerScheduler', () => {
       expect(scheduler.state.isReshoot).toBe(false)
     })
 
+    it('does not skip the unshot series when a reshoot started before it is interrupted', () => {
+      scheduler.loadProgram('standard')
+      scheduler.jumpTo(1, 0, 2)
+      expect(scheduler.state.phase).toBe('idle')
+      expect(scheduler.state.seriesIndex).toBe(2)
+
+      // Nobody has shot series 3 yet. Stopping a reshoot run from here must
+      // leave Next series on series 3, not jump to series 4.
+      scheduler.startReshoot('Ola')
+      scheduler.stop()
+      expect(scheduler.state.stoppedReason).toBeNull()
+      scheduler.nextSeries()
+      expect(scheduler.state.seriesIndex).toBe(2)
+      expect(scheduler.state.isReshoot).toBe(false)
+
+      // A reload after such a reshoot's countdown would have ended does the same
+      scheduler.stop()
+      scheduler.jumpTo(1, 0, 2)
+      scheduler.startReshoot('Ola')
+      const saved = JSON.parse(JSON.stringify(scheduler.state))
+      vi.advanceTimersByTime(300_000)
+      scheduler.destroy()
+      scheduler = new TimerScheduler()
+      scheduler.restoreState(saved)
+      expect(scheduler.state.phase).toBe('stopped')
+      expect(scheduler.state.stoppedReason).toBeNull()
+      expect(scheduler.state.seriesIndex).toBe(2)
+    })
+
     it('keeps Restart available after stopping a reshoot of the last series', () => {
       scheduler.loadProgram('standard')
       const last = scheduler.program.stages.length - 1
