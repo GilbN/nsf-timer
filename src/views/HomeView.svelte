@@ -142,6 +142,9 @@
   }
 
   function submit() {
+    // Enter can fire while a join is still in flight; a second join for the
+    // same lane would be rejected and its cleanup could undo the first
+    if (connecting) return
     if (mode === 'display') joinDisplay()
     else joinRoom()
   }
@@ -155,7 +158,7 @@
     const params = new URLSearchParams(window.location.search)
     const room = params.get('room')
     if (room) {
-      joinCode = room.toUpperCase().slice(0, 4)
+      joinCode = cleanCode(room)
       history.replaceState({}, '', window.location.pathname)
       mode = 'join'
       setTimeout(() => joinCodeInput?.focus(), 50)
@@ -253,41 +256,44 @@
             {/each}
           </div>
         {:else}
-          <p class="empty faint">{$t('noRecentRooms')}</p>
+          <p class="empty muted">{$t('noRecentRooms')}</p>
         {/if}
       </div>
     </div>
 
-    {#if connecting || error}
-      <div class="status" role="status">
-        {#if connecting}
-          <span class="spinner"></span>{$t('connecting')}…
-        {:else}
-          <span class="led red"></span><span class="err">{error}</span>
-        {/if}
-      </div>
-    {/if}
+    <!-- Layout only: a column of its own in landscape, invisible in portrait -->
+    <div class="keys-col">
+      {#if connecting || error}
+        <div class="status" role={error && !connecting ? 'alert' : 'status'}>
+          {#if connecting}
+            <span class="spinner"></span>{$t('connecting')}…
+          {:else}
+            <span class="led red"></span><span class="err">{error}</span>
+          {/if}
+        </div>
+      {/if}
 
-    <div class="pad">
-      <button class="key key-white" onclick={createRoom} disabled={connecting}>
-        <Icon name="plus" />
-        <span>{$t('createRoom')}<small>{$t('createRoomHint')}</small></span>
-      </button>
-      <button class="key" onclick={() => openMode('join')} disabled={connecting}>
-        <Icon name="arrow-right" />
-        <span>{$t('join')}<small>{$t('roomCode')}</small></span>
-      </button>
-      <button class="key" onclick={startSolo} disabled={connecting}>
-        <Icon name="user" />
-        <span>{$t('soloMode')}</span>
-      </button>
-      <button class="key" onclick={openStopwatch} disabled={connecting}>
-        <Icon name="stopwatch" />
-        <span>{$t('stopwatch')}</span>
-      </button>
-      <button class="key key-row span-2" onclick={() => openMode('display')} disabled={connecting}>
-        <Icon name="screen" />{$t('spectatorScreen')}
-      </button>
+      <div class="pad">
+        <button class="key key-white" onclick={createRoom} disabled={connecting}>
+          <Icon name="plus" />
+          <span>{$t('createRoom')}<small>{$t('createRoomHint')}</small></span>
+        </button>
+        <button class="key" onclick={() => openMode('join')} disabled={connecting}>
+          <Icon name="arrow-right" />
+          <span>{$t('join')}<small>{$t('roomCode')}</small></span>
+        </button>
+        <button class="key" onclick={startSolo} disabled={connecting}>
+          <Icon name="user" />
+          <span>{$t('soloMode')}</span>
+        </button>
+        <button class="key" onclick={openStopwatch} disabled={connecting}>
+          <Icon name="stopwatch" />
+          <span>{$t('stopwatch')}</span>
+        </button>
+        <button class="key key-row span-2" onclick={() => openMode('display')} disabled={connecting}>
+          <Icon name="screen" />{$t('spectatorScreen')}
+        </button>
+      </div>
     </div>
   {:else}
     <div class="top-bar">
@@ -298,11 +304,11 @@
     </div>
 
     <form class="form well" onsubmit={(e) => { e.preventDefault(); submit() }} novalidate>
-      <div class="seg" role="tablist" aria-label={$t('joinRoom')}>
-        <button type="button" role="tab" aria-selected={mode === 'join'} class:on={mode === 'join'} onclick={() => openMode('join')}>
+      <div class="seg" role="group" aria-label={$t('joinRoom')}>
+        <button type="button" aria-pressed={mode === 'join'} class:on={mode === 'join'} disabled={connecting} onclick={() => openMode('join')}>
           {$t('join')}
         </button>
-        <button type="button" role="tab" aria-selected={mode === 'display'} class:on={mode === 'display'} onclick={() => openMode('display')}>
+        <button type="button" aria-pressed={mode === 'display'} class:on={mode === 'display'} disabled={connecting} onclick={() => openMode('display')}>
           {$t('spectator')}
         </button>
       </div>
@@ -382,7 +388,8 @@
       {/if}
 
       <!-- Lets Enter submit from any field -->
-      <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+      <!-- Lets Enter/Go submit; not display:none, which some browsers skip -->
+      <button type="submit" class="sr-only" aria-hidden="true" tabindex="-1"></button>
     </form>
 
     <div class="form-keys">
@@ -451,7 +458,7 @@
     padding-bottom: 6px;
   }
 
-  .clear { font-size: 0.75rem; font-weight: 700; padding: 6px 0 6px 12px; }
+  .clear { font-size: 0.75rem; font-weight: 700; padding: 6px 0 6px 12px; min-height: 44px; }
 
   .recent-list { overflow-y: auto; min-height: 0; }
 
@@ -498,10 +505,12 @@
     min-height: 300px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1.3fr 1fr 60px;
+    grid-template-rows: 1.3fr 1fr minmax(60px, auto);
     gap: 10px;
     padding: 12px var(--pad-x) 0;
   }
+
+  .keys-col { display: contents; }
 
   .pad .span-2 { grid-column: span 2; }
   .pad .key span { display: block; }
@@ -587,6 +596,90 @@
   @media (max-height: 640px) {
     .lcd { max-height: 220px; padding-top: 14px; }
     .tagline { margin-bottom: 8px; }
-    .pad { min-height: 260px; grid-template-rows: 1.2fr 1fr 52px; }
+    .pad { min-height: 260px; grid-template-rows: 1.2fr 1fr minmax(52px, auto); }
+  }
+
+  /*
+   * Landscape: the display panel on the left, the keypad on the right.
+   * The spacer rows above and below centre the pair once the keypad row
+   * reaches its cap, so keys never stretch into tall pillars.
+   */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .home-view {
+      max-width: 1180px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+      grid-template-rows: auto minmax(0, 1fr) minmax(0, 680px) minmax(0, 1fr);
+      grid-template-areas:
+        'bar bar'
+        '. .'
+        'lcd keys'
+        '. .';
+    }
+
+    .top-bar { grid-area: bar; }
+
+    .lcd {
+      grid-area: lcd;
+      margin: 6px 0 0 var(--pad-x);
+      max-height: none;
+      padding: 26px 26px 14px;
+    }
+
+    .mark { width: 36px; height: 36px; }
+    .brand { gap: 12px; }
+    .brand h1 { font-size: 1.625rem; }
+    .tagline { font-size: 0.875rem; margin: 6px 0 18px; }
+
+    /* The list sits at the foot of the panel, under the brand */
+    .recent { margin-top: auto; }
+
+    .keys-col {
+      grid-area: keys;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .status { margin: 6px var(--pad-x) 0 12px; }
+
+    .pad {
+      min-height: 240px;
+      padding: 6px var(--pad-x) 0 12px;
+      grid-template-rows: 1.3fr 1fr minmax(60px, auto);
+    }
+
+    /* Join and spectator: the form on the left, its key beside it */
+    .home-view:has(> .form) {
+      max-width: 920px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1.4fr);
+      grid-template-areas:
+        'bar bar'
+        '. .'
+        'form keys'
+        '. .';
+    }
+
+    .form { grid-area: form; margin: 6px 0 0 var(--pad-x); }
+
+    .form-keys {
+      grid-area: keys;
+      margin-top: 0;
+      padding: 6px var(--pad-x) 0 12px;
+    }
+
+    .form-keys .key { min-height: 140px; }
+  }
+
+  @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
+    .lcd { padding: 16px 20px 8px; }
+    .mark { width: 28px; height: 28px; }
+    .brand h1 { font-size: 1.25rem; }
+    .tagline { font-size: 0.8125rem; margin: 4px 0 8px; }
+    .recent-row { height: 42px; }
+    .pad { grid-template-rows: 1.2fr 1fr minmax(52px, auto); }
+    .form { gap: 12px; padding: 12px; }
+    .code-input { height: 60px; font-size: 1.875rem; }
   }
 </style>

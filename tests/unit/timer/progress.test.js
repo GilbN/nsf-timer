@@ -41,6 +41,11 @@ describe('forwardOptions', () => {
     expect(f.primary).toBe('slot3')
   })
 
+  it('offers the unshot series after a reshoot run from idle', () => {
+    const f = forwardOptions(program, { ...base, seriesIndex: 1, stoppedReason: null }, t, 'no')
+    expect(f).toMatchObject({ showNextSeries: true, nextSeriesNumber: 2, primary: 'nextSeries' })
+  })
+
   it('offers nothing when the program is complete', () => {
     const f = forwardOptions(program, { ...base, stageIndex: 1, stoppedReason: 'programComplete' }, t, 'no')
     expect(f).toEqual({ showNextSeries: false, nextSeriesNumber: 0, slot3: null, primary: null })
@@ -74,6 +79,9 @@ describe('labels', () => {
   it('describes the first series before the host starts', () => {
     expect(upNextText(program, { ...base, phase: 'idle' }, t, 'no')).toBe('Serie 1/4, 60 s lading')
   })
+  it('names the series the host jumped to', () => {
+    expect(upNextText(program, { ...base, phase: 'idle', seriesIndex: 2 }, t, 'no')).toBe('Serie 3/4, 60 s lading')
+  })
   it('says nothing while a series runs', () => {
     expect(upNextText(program, { ...base, phase: 'shooting' }, t, 'no')).toBeNull()
   })
@@ -85,8 +93,8 @@ describe('clockText', () => {
     expect(clockText({ phase: 'idle', remainingMs: 0 }, ex, 'seconds')).toBe('60')
     expect(clockText({ phase: 'idle', remainingMs: 0 }, ex, 'mmss')).toBe('1:00')
   })
-  it('falls back to the series time when there is no loading', () => {
-    expect(clockText({ phase: 'idle', remainingMs: 0 }, { timePerSeries: 150 }, 'mmss')).toBe('2:30')
+  it('previews 60 s of loading when loading time is 0, like the scheduler', () => {
+    expect(clockText({ phase: 'idle', remainingMs: 0 }, { loadingTime: 0, timePerSeries: 150 }, 'mmss')).toBe('1:00')
   })
   it('rounds the remaining time up to whole seconds while running', () => {
     expect(clockText({ phase: 'shooting', remainingMs: 13200 }, ex, 'seconds')).toBe('14')

@@ -16,6 +16,7 @@
   import SettingsMenu from '../components/SettingsMenu.svelte'
   import JumpToModal from '../components/JumpToModal.svelte'
   import Icon from '../components/ui/Icon.svelte'
+  import ProgramOutline from '../components/ProgramOutline.svelte'
   import { contextFor } from '../lib/timer/progress.js'
 
   // Capture role at mount time so it's stable even if roomState changes on disconnect
@@ -194,9 +195,10 @@
     </div>
     <div class="cluster">
       {#if isHost && !$roomState.isSolo}
-        <span class="pill tnum" aria-label="{$roomState.connectedPeers.length} {$t('peers')}">
+        <span class="pill tnum">
           <span class="led" class:off={$roomState.connectedPeers.length === 0}></span>{$roomState.connectedPeers.length}
           <Icon name="users" />
+          <span class="sr-only">{$t('peers')}</span>
         </span>
       {/if}
       <SettingsMenu actions={menuActions} />
@@ -225,9 +227,10 @@
   </div>
 
   <div class="body">
-    <TimerDisplay {isHost} />
+    <TimerDisplay {isHost} live={!initialIsClient || connectionStatus === 'connected'} />
 
     <div class="panel">
+      <div class="outline-slot"><ProgramOutline /></div>
       {#if isHost}
         <ControlBar
           onStart={handleStart}
@@ -275,7 +278,7 @@
     padding: 0 var(--pad-x);
   }
 
-  .notices:not(:empty) { margin-bottom: 10px; }
+  .notices:has(> *) { margin-bottom: 10px; }
 
   .notice {
     display: flex;
@@ -311,20 +314,25 @@
     height: clamp(150px, 26dvh, 210px);
   }
 
-  /* Landscape tablets: display on the left, keys on the right */
-  @media (orientation: landscape) and (min-width: 700px) {
-    .timer-view { max-width: 1100px; }
+  .outline-slot { display: none; }
+
+  /* Landscape: the display on the left, a side column for keys or tiles */
+  @media (orientation: landscape) and (min-width: 560px) {
+    .timer-view { max-width: 1240px; }
     .body { flex-direction: row; align-items: stretch; }
-    .panel { width: min(44%, 440px); display: flex; flex-direction: column; }
-    .tiles { height: auto; flex: 1; }
-    /* The keys take the full height beside the display */
-    .panel :global(.keypad) { flex: 1; }
-    .panel :global(.keypad .main) { flex: 1; height: auto; }
+    .panel {
+      width: clamp(240px, 36%, 320px);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .tiles { height: auto; }
   }
 
-  /* Short landscape phones: keep the keys compact */
-  @media (orientation: landscape) and (max-height: 500px) {
-    .body { flex-direction: row; }
-    .panel { width: 46%; display: flex; flex-direction: column; justify-content: flex-end; }
+  /* Tablets and desktops: room for the program outline above the keys */
+  @media (orientation: landscape) and (min-width: 900px) and (min-height: 560px) {
+    .panel { width: 360px; }
+    .outline-slot { display: flex; flex: 1; min-height: 0; }
   }
 </style>

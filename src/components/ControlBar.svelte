@@ -2,7 +2,7 @@
   import { timerState, preferences } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
-  import { forwardOptions, upNextText, contextFor } from '../lib/timer/progress.js'
+  import { forwardOptions, upNextText, contextFor, loadingSeconds } from '../lib/timer/progress.js'
   import Icon from './ui/Icon.svelte'
 
   /**
@@ -42,7 +42,7 @@
   })
 
   let slot3Label = $derived(f.slot3?.kind === 'stage' ? $t('nextStageLabel') : $t('nextExerciseLabel'))
-  let loadingSuffix = $derived(exercise?.loadingTime ? `, ${exercise.loadingTime} s ${$t('metaLoading')}` : '')
+  let loadingSuffix = $derived(exercise ? `, ${loadingSeconds(exercise)} s ${$t('metaLoading')}` : '')
 </script>
 
 <div class="keypad" data-phase={phase}>
@@ -101,7 +101,8 @@
           <span>{slot3Label}<small>{f.slot3.name}</small></span>
         </button>
       {/if}
-      <button class="key" onclick={onRestart}>
+      <!-- Restart is the only way on after stopping the last series -->
+      <button class="key" class:key-white={!f.primary} onclick={onRestart}>
         <Icon name="reset" />
         <span>{$t('restartSeries')}<small>{$t('series')} {restartNumber} {$t('again')}</small></span>
       </button>
@@ -132,18 +133,19 @@
     flex: none;
   }
 
+  /* min-height, not height: keys grow with the text-size setting */
   .main {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    height: clamp(128px, 24dvh, 190px);
+    min-height: clamp(128px, 24dvh, 190px);
   }
 
   .main.one { grid-template-columns: 1fr; }
   .main.stopped { grid-auto-rows: 1fr; }
   .main.stopped:not(.three) { grid-template-columns: 1fr 1fr; }
-  .main.three { height: clamp(220px, 36dvh, 300px); grid-template-rows: 1.15fr 1fr; }
-  .main .wide { grid-column: span 2; }
+  .main.three { min-height: clamp(220px, 36dvh, 300px); grid-template-rows: 1.15fr 1fr; }
+  .main .wide, .main.stopped .key:only-child { grid-column: span 2; }
 
   .main .key span { display: block; }
 
@@ -151,12 +153,43 @@
 
   .row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
   }
 
+  .row .key { min-width: 0; white-space: nowrap; overflow: hidden; }
+
   .row .key { min-height: 60px; padding: 12px 16px; }
   .row .key:only-child { grid-column: span 2; }
+
+  /* Landscape phones and small tablets: one column of compact keys beside
+     the display, icon next to the label. Tablets and desktops keep the
+     normal keypad under the program outline. Matches TimerView's rules. */
+  @media (orientation: landscape) and (min-width: 560px) and (max-height: 559px),
+    (orientation: landscape) and (min-width: 560px) and (max-width: 899px) {
+    .main, .main.one, .main.three, .main.stopped:not(.three) {
+      min-height: 0;
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      grid-auto-rows: auto;
+      gap: 8px;
+    }
+    .main .wide, .main.stopped .key:only-child { grid-column: auto; }
+    .main .key {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      min-height: 56px;
+      padding: 10px 14px;
+    }
+    .main .key :global(svg) { width: 22px; height: 22px; }
+    .main .key small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .main .key span { min-width: 0; }
+    .row .key { min-height: 48px; padding: 10px 12px; gap: 8px; }
+    /* The side column is narrow here: drop the row icons so labels and the count fit */
+    .row .key :global(svg) { display: none; }
+  }
 
   .count {
     margin-left: auto;

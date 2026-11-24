@@ -17,6 +17,11 @@ export function contextFor(program, ts) {
   return { stage, exercise }
 }
 
+/** Loading seconds the scheduler will run: it treats 0 or a missing value as 60. */
+export function loadingSeconds(exercise) {
+  return exercise?.loadingTime || 60
+}
+
 /** Seconds as "60 s", keeping one decimal for times like 3.29 s. */
 export function fmtSec(s) {
   if (s == null) return ''
@@ -65,7 +70,7 @@ export function seriesLabel(exercise, ts, t) {
 export function exerciseFacts(stage, exercise, t) {
   if (!stage || !exercise) return []
   const parts = []
-  if (exercise.loadingTime) parts.push(`${fmtSec(exercise.loadingTime)} ${t('metaLoading')}`)
+  parts.push(`${fmtSec(loadingSeconds(exercise))} ${t('metaLoading')}`)
   if (stage.type === 'duell' && exercise.targetVisibleTime && exercise.targetHiddenTime) {
     parts.push(`${fmtSec(exercise.targetHiddenTime)} ${t('metaHidden')}`)
     parts.push(`${fmtSec(exercise.targetVisibleTime)} ${t('metaVisible')}`)
@@ -94,7 +99,9 @@ export function forwardOptions(program, ts, t, lang) {
   if (!program || !stage || !exercise) return none
 
   let nextSeriesNumber = 0
-  if (reason === 'seriesComplete' && ts.seriesIndex < exercise.seriesCount) nextSeriesNumber = ts.seriesIndex + 1
+  // null: a reshoot run from idle has finished, and seriesIndex still points
+  // at the series nobody has shot yet (TimerScheduler.nextSeries runs it).
+  if ((reason === 'seriesComplete' || reason === null) && ts.seriesIndex < exercise.seriesCount) nextSeriesNumber = ts.seriesIndex + 1
   if (reason === 'aborted' && ts.seriesIndex + 1 < exercise.seriesCount) nextSeriesNumber = ts.seriesIndex + 2
   const showNextSeries = nextSeriesNumber > 0
 
@@ -136,7 +143,7 @@ export function upNextText(program, ts, t, lang) {
   if (!program || !stage || !exercise) return null
 
   if (ts.phase === 'idle') {
-    return `${t('series')} 1/${exercise.seriesCount}${exercise.loadingTime ? `, ${fmtSec(exercise.loadingTime)} ${t('metaLoading')}` : ''}`
+    return `${seriesLabel(exercise, ts, t)}, ${fmtSec(loadingSeconds(exercise))} ${t('metaLoading')}`
   }
   if (ts.phase !== 'stopped') return null
 
@@ -149,16 +156,15 @@ export function upNextText(program, ts, t, lang) {
 }
 
 /**
- * The digits to show. Before the host starts, preview the time that will
- * count down first (loading, or the series time when there is no loading)
- * instead of a bare 0.
+ * The digits to show. Before the host starts, preview the loading time,
+ * which is what counts down first, instead of a bare 0.
  * @param {{ phase: string, remainingMs: number }} ts
  * @param {any} exercise
  * @param {'seconds' | 'mmss' | string} format
  */
 export function clockText(ts, exercise, format) {
   let ms = ts.remainingMs
-  if (ts.phase === 'idle' && exercise) ms = (exercise.loadingTime || exercise.timePerSeries || 0) * 1000
+  if (ts.phase === 'idle' && exercise) ms = loadingSeconds(exercise) * 1000
   const total = Math.max(0, Math.ceil(ms / 1000))
   if (format === 'seconds') return String(total)
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`

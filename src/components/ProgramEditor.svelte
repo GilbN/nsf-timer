@@ -174,13 +174,12 @@
 
       <input class="input" type="text" bind:value={ds.name.no} placeholder={$t('stageName')} aria-label={$t('stageName')} />
 
-      <div class="types" role="radiogroup" aria-label="{$t('stage')} {dsIdx + 1}">
+      <div class="types" role="group" aria-label="{$t('stage')} {dsIdx + 1}">
         {#each TYPES as type (type)}
           <button
             class="type"
             class:on={ds.type === type}
-            role="radio"
-            aria-checked={ds.type === type}
+            aria-pressed={ds.type === type}
             onclick={() => { if (ds.type !== type) updateType(dsIdx, type) }}
           >{$t(type)}</button>
         {/each}
@@ -286,7 +285,7 @@
 
   .stage-no { font-size: 0.8125rem; font-weight: 800; color: var(--muted); }
   .exercise-head { font-size: 0.8125rem; font-weight: 700; }
-  .stage-head .btn, .exercise-head .btn { height: 36px; width: 36px; color: var(--muted); }
+  .stage-head .btn, .exercise-head .btn { height: 44px; width: 44px; color: var(--muted); }
 
   .types {
     display: grid;
@@ -312,9 +311,10 @@
 
   .exercise { display: flex; flex-direction: column; gap: 6px; }
 
+  /* Two columns only while each field has room for a 3-digit value at any text size */
   .fields {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
     gap: 8px;
   }
 
@@ -335,15 +335,15 @@
 
   .stepper {
     display: grid;
-    grid-template-columns: 36px 1fr 36px;
+    grid-template-columns: 44px 1fr 44px;
     align-items: center;
     width: 100%;
     gap: 4px;
   }
 
   .step {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
     display: grid;
     place-items: center;

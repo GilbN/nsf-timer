@@ -27,11 +27,15 @@
     return null
   })
 
-  let signal = $derived(signalFor($timerState))
+  // While the connection is down the last state may be stale: lamp off and
+  // a dark display rather than an Ild that may no longer be true
+  let live = $derived(connectionStatus === 'connected')
+  let signal = $derived(live ? signalFor($timerState) : { lamp: 'off', lit: false })
   let progress = $derived(seriesProgress(exercise, $timerState))
   let facts = $derived(exerciseFacts(stage, exercise, $t))
 
   let stateWord = $derived.by(() => {
+    if (!live) return $t('lastReceived')
     if (phase === 'idle') return $t('waitingForHost')
     if (phase === 'shooting') return $timerState.targetVisible ? $t('targetUp') : $t('targetDown')
     if (phase === 'stopped' && $timerState.stoppedReason === 'programComplete') return $t('programComplete')
@@ -47,7 +51,7 @@
   let digits = $derived(clockText($timerState, exercise, $preferences.countdownFormat))
 
   let tone = $derived(
-    phase === 'loading' || phase === 'shooting' ? 'live' : phase === 'paused' ? 'paused' : 'rest'
+    !live ? 'rest' : phase === 'loading' || phase === 'shooting' ? 'live' : phase === 'paused' ? 'paused' : 'rest'
   )
 
   // Client connection status
@@ -150,7 +154,7 @@
   .muted-pill { color: var(--muted); }
 
   .notices { display: flex; flex-direction: column; gap: 8px; }
-  .notices:not(:empty) { margin-bottom: 10px; }
+  .notices:has(> *) { margin-bottom: 10px; }
 
   .notice {
     display: flex;
@@ -217,8 +221,8 @@
   }
 
   .time[data-tone='live'] .digits { color: #e4e4e7; }
-  .time[data-tone='paused'] .digits { color: var(--muted); }
-  .time[data-tone='rest'] .digits { color: var(--faint); }
+  .time[data-tone='paused'] .digits { color: #b4b4b9; }
+  .time[data-tone='rest'] .digits { color: var(--muted); }
   :global(.display.lit) .time .digits { color: var(--ink); }
 
   /* Landscape: context bottom left, digits filling the right */

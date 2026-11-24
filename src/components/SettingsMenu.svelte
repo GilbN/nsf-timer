@@ -183,5 +183,5 @@
   }
 
   .about a { color: var(--muted); text-decoration: none; height: 40px; padding: 0 10px; }
-  .licence { margin-left: auto; padding-right: 8px; font-size: 0.8125rem; font-weight: 600; color: var(--faint); }
+  .licence { margin-left: auto; padding-right: 8px; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
 </style>

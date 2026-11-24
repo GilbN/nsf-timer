@@ -174,7 +174,7 @@
         class:paused={!running && elapsed > 0}
         onclick={() => { if (elapsed === 0) editing = !editing }}
         disabled={!canEdit}
-        aria-label={canEdit ? `${$t('countdownMinLabel')} / ${$t('countdownSecondsLabel')}` : undefined}
+        aria-label={canEdit ? `${mainText}.${display.ms}, ${$t('countdownHint')}` : undefined}
       >
         <span class="digits sw-digits" style="--chars: {mainText.length + 1}">{mainText}<span class="hund">.{display.ms}</span></span>
       </button>
@@ -253,7 +253,7 @@
     display: flex;
     align-items: flex-end;
     text-align: left;
-    color: var(--faint);
+    color: var(--muted);
   }
 
   .time:disabled { cursor: default; }
@@ -324,7 +324,58 @@
 
   .pad.editing .main { height: clamp(104px, 17dvh, 150px); }
 
-  @media (orientation: landscape) and (max-height: 500px) {
-    .stopwatch-view { max-width: 1000px; }
+  /*
+   * Landscape: the display takes the left, the keys stand in a column on
+   * the right, Start on top. The keys column has a fixed width so the keys
+   * keep their phone proportions while the digits grow with the screen.
+   */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .stopwatch-view {
+      max-width: 1180px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) clamp(240px, 32%, 380px);
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas: 'bar bar' 'display pad';
+    }
+
+    .top-bar { grid-area: bar; }
+
+    :global(.stopwatch-view .sw-display) {
+      grid-area: display;
+      margin: 6px 0 0 var(--pad-x);
+      padding: 28px 28px 22px;
+    }
+
+    .editor-input { font-size: clamp(5rem, 14vw, 11rem); }
+    .colon { font-size: clamp(3.5rem, 9vw, 7.5rem); }
+
+    .pad {
+      grid-area: pad;
+      min-height: 0;
+      padding: 6px var(--pad-x) 0 12px;
+    }
+
+    .pad .main,
+    .pad.editing .main {
+      flex: 1 1 auto;
+      height: auto;
+      max-height: 720px;
+      min-height: 140px;
+      margin-top: auto;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1.5fr 1fr;
+    }
+  }
+
+  @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
+    :global(.stopwatch-view .sw-display) { padding: 18px 18px 14px; gap: 6px; }
+    .editor-input { font-size: clamp(3.5rem, 11vw, 6rem); }
+    .colon { font-size: clamp(2.5rem, 7vw, 4rem); padding-bottom: 22px; }
+    .adjust .key { min-height: 48px; padding: 8px 12px; }
+    .pad .main,
+    .pad.editing .main { min-height: 120px; }
+
+    /* Too short for icon-over-label keys: put them on one line */
+    .pad .main .key { flex-direction: row; align-items: center; justify-content: flex-start; padding: 10px 18px; }
   }
 </style>

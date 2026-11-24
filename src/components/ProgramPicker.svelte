@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte'
   import { get } from 'svelte/store'
   import { preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
@@ -45,6 +46,8 @@
   async function handleDelete(e, program) {
     e.stopPropagation()
     sheetProgram = null
+    // Let the sheet close first so the confirm isn't stacked on top of it
+    await tick()
     if (!(await confirmAction(get(t)('confirmDeleteProgram'), get(t)('deleteProgram')))) return
     deleteCustomProgram(program.id)
     customPrograms = loadCustomPrograms()
@@ -198,9 +201,12 @@
 
   .slot { position: relative; min-width: 0; }
 
+  /* min-height so long names and big text grow the key; top padding clears the corner button */
   .program {
     width: 100%;
-    height: 112px;
+    min-height: 112px;
+    height: 100%;
+    padding-top: 48px;
     justify-content: flex-end;
   }
 
@@ -234,6 +240,15 @@
     grid-column: span 2;
     min-height: 60px;
     color: var(--muted);
+  }
+
+  /* Wide lobbies (landscape tablets and desktops) take three keys a row */
+  .program-picker { container-type: inline-size; }
+
+  @container (min-width: 600px) {
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .program { min-height: 140px; }
+    .add { grid-column: 1 / -1; }
   }
 
   /* ── Sheet ── */

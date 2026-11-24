@@ -52,5 +52,10 @@
   .code :global(svg) { color: var(--muted); }
   .copied { font-size: 0.75rem; font-weight: 700; color: var(--muted); letter-spacing: 0; }
   .share { width: 30px; padding: 0; justify-content: center; }
+
+  /* The pills stay 30px tall but take taps across a 44px area */
+  .room-code { gap: 10px; }
+  .code, .share { position: relative; }
+  .code::after, .share::after { content: ""; position: absolute; inset: -7px -5px; }
   .share :global(svg) { color: var(--muted); }
 </style>

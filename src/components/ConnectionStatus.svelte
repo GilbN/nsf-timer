@@ -35,7 +35,7 @@
     {:else}
       <span class="led" class:red={!ok}></span>
     {/if}
-    {label}
+    <span class="label">{label}</span>
   </span>
 {:else if variant === 'banner' && !ok}
   <div class="banner" role="alert">
@@ -48,6 +48,11 @@
 {/if}
 
 <style>
+  /* Narrow phones: the room code, share and menu need the room; keep the light */
+  @media (max-width: 379px) {
+    .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  }
+
   .pill.dim { color: var(--muted); }
 
   .spinner.small {

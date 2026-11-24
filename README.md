@@ -28,9 +28,9 @@
 - **Multi-device sync.** The host creates a room and shooters join with a 4-character code. Timer state syncs in real time over WebSocket.
 - **Malfunction handling.** Tracks malfunctions per shooter (max 2 per program, 1 per stage) and starts reshoots.
 - **Solo mode.** Run a full program on one device without a room.
-- **Spectator screen.** A landscape view with no controls for a monitor or tablet at the range.
+- **Spectator screen.** A view with no controls for a monitor or tablet at the range, laid out for landscape or portrait.
 - **Stopwatch.** Counts up, or down from a time you set.
-- **Offline PWA.** Install it to the home screen. Fonts and the app are cached, so it works without internet after the first load.
+- **Offline PWA.** Install it to the home screen. The app and its fonts are cached, so solo mode and the stopwatch work without internet after the first load. Shared rooms need a connection to the relay server.
 - **Norwegian and English.**
 - **Settings.** Sound, screen wake lock, text size, language, and countdown and stopwatch formats.
 
@@ -43,10 +43,10 @@ A lamp strip along the top of the display shows whether to shoot:
 | Lamp | Display | Meaning |
 |------|---------|---------|
 | Off | Dark | Nothing is running |
-| Red | Dark | Loading, targets turned away (Klar), paused or stopped |
-| Green | White | Targets facing the shooters (Ild) |
+| Red | Dark | Loading, targets turned away (Klar / Attention), paused or stopped |
+| Green | White | Targets facing the shooters (Ild / Fire) |
 
-Because the display also turns white on Ild, the signal still reads for shooters who can't tell red from green, and from across the firing line.
+Because the display also turns white on Ild, the signal still reads for shooters who can't tell red from green, and from across the firing line. If a shooter's or spectator's connection drops, the lamp goes off and the display stays dark until the timer state is live again.
 
 Change program, jump to stage, refresh and disconnect sit in the ⋯ menu, so the timer screen only shows what you press during a match. Dialogs and pickers open as bottom sheets within thumb reach.
 

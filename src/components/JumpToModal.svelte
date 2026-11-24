@@ -54,13 +54,12 @@
       <span class="aside">{getLocalizedName(program.name, lang)}</span>
     </div>
 
-    <div class="key-grid stages" role="radiogroup" aria-label={$t('stage')}>
+    <div class="key-grid stages" role="group" aria-label={$t('stage')}>
       {#each program.stages as stage, i (i)}
         <button
           class="key opt"
           class:key-white={selectedStageIdx === i}
-          role="radio"
-          aria-checked={selectedStageIdx === i}
+          aria-pressed={selectedStageIdx === i}
           onclick={() => selectStage(i)}
         >
           <span>{getLocalizedName(stage.name, lang)}<small class="tnum">{stageSummary(stage)}</small></span>
@@ -70,13 +69,12 @@
 
     {#if showExercisePicker && selectedStage}
       <span class="field-label">{$t('exercise')}</span>
-      <div class="key-grid" role="radiogroup" aria-label={$t('exercise')}>
+      <div class="key-grid" role="group" aria-label={$t('exercise')}>
         {#each selectedStage.exercises as ex, i (i)}
           <button
             class="key opt"
             class:key-white={selectedExerciseIdx === i}
-            role="radio"
-            aria-checked={selectedExerciseIdx === i}
+            aria-pressed={selectedExerciseIdx === i}
             onclick={() => selectExercise(i)}
           >
             <span>{$t('exercise')} {i + 1}<small class="tnum">{ex.seriesCount} × {ex.shotsPerSeries}, {fmt(ex.timePerSeries ?? ex.targetVisibleTime)} s</small></span>
@@ -87,13 +85,12 @@
 
     {#if selectedExercise}
       <span class="field-label">{$t('series')}</span>
-      <div class="numbers" role="radiogroup" aria-label={$t('series')}>
+      <div class="numbers" role="group" aria-label={$t('series')}>
         {#each { length: selectedExercise.seriesCount } as _, i (i)}
           <button
             class="key num tnum"
             class:key-white={selectedSeriesIdx === i}
-            role="radio"
-            aria-checked={selectedSeriesIdx === i}
+            aria-pressed={selectedSeriesIdx === i}
             onclick={() => (selectedSeriesIdx = i)}
           >{i + 1}</button>
         {/each}

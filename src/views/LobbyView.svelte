@@ -127,4 +127,58 @@
     padding: 0 var(--pad-x) 4px;
     -webkit-overflow-scrolling: touch;
   }
+
+  /*
+   * Landscape: the room code becomes a tall sign on the left, readable from
+   * a few metres away, with the program keys beside it. Solo and the
+   * program editor have no sign, so the content gets a wider centred column.
+   */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .lobby-view { max-width: 1180px; }
+
+    .lobby-view:has(> .room) {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas: 'bar bar' 'room content';
+    }
+
+    .top-bar { grid-area: bar; }
+
+    .room {
+      grid-area: room;
+      margin: 6px 0 0 var(--pad-x);
+      padding: 26px 26px 24px;
+      gap: 6px;
+      justify-content: center;
+      container-type: inline-size;
+      min-height: 0;
+    }
+
+    .label { font-size: 0.875rem; }
+
+    /* Four characters fill the panel width, up to a sign-sized cap */
+    .code {
+      font-size: min(34cqw, 10rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+
+    .peers { font-size: 1.125rem; gap: 10px; margin-top: 10px; }
+    .peers .led { width: 10px; height: 10px; }
+
+    .content {
+      grid-area: content;
+      padding: 6px var(--pad-x) 4px 12px;
+    }
+
+    .lobby-view:not(:has(> .room)) { max-width: 980px; }
+    .lobby-view:not(:has(> .room)) .content { padding: 6px var(--pad-x) 4px; }
+  }
+
+  @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
+    .room { padding: 16px 20px; justify-content: flex-start; }
+    .code { font-size: min(34cqw, 6rem); }
+    .peers { font-size: 0.9375rem; margin-top: 4px; }
+  }
 </style>

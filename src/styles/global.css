@@ -115,6 +115,22 @@ input, select, textarea {
   max-width: 560px;
   margin: 0 auto;
   padding: calc(env(safe-area-inset-top, 0px) + 6px) 0 calc(env(safe-area-inset-bottom, 0px) + 14px);
+  /* Short landscape phones, big text or an open keyboard: scroll, never clip */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Visible to screen readers only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .top-bar {
@@ -161,7 +177,7 @@ input, select, textarea {
 }
 
 .key svg { width: 26px; height: 26px; flex: none; }
-.key:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: brightness(1.15); }
+button.key:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: brightness(1.15); }
 .key:disabled { opacity: 0.45; }
 
 .key-white {
@@ -171,7 +187,7 @@ input, select, textarea {
 }
 
 .key-white small { color: var(--ink-soft); }
-.key-white:active:not(:disabled) { filter: brightness(0.92); }
+button.key-white:active:not(:disabled) { filter: brightness(0.92); }
 
 .key-line {
   background: transparent;
@@ -281,7 +297,7 @@ input, select, textarea {
   outline: none;
 }
 
-.input::placeholder { color: var(--faint); }
+.input::placeholder { color: var(--muted); }
 .input:focus-visible { outline: 2px solid var(--fg); outline-offset: 0; }
 .input[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--fg); }
 

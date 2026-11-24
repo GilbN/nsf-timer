@@ -30,8 +30,9 @@
             </span>
             {#if canReshoot && peer.canJam}
               <button class="btn btn-white reshoot" onclick={() => onReshoot(peer)}>{$t('reshoot')}</button>
-            {:else}
-              <span class="reshoot none tnum">{Math.max(0, 2 - peer.jamsUsed)} {$t('jamsRemaining')}</span>
+            {:else if canReshoot}
+              <!-- No button: either both malfunctions are used, or one was used in this stage -->
+              <span class="reshoot none tnum">{peer.jamsUsed >= 2 ? `0 ${$t('jamsRemaining')}` : $t('usedThisStage')}</span>
             {/if}
           </li>
         {/each}
@@ -100,7 +101,7 @@
   }
 
   .jams { display: inline-flex; gap: 4px; flex: none; }
-  .jams i { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px var(--faint); }
+  .jams i { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px #6e6e73; }
   .jams i.used { background: var(--fg); box-shadow: none; }
 
   .reshoot { height: 40px; border-radius: 12px; padding: 0 12px; }
@@ -109,7 +110,7 @@
     align-items: center;
     font-size: 0.75rem;
     font-weight: 700;
-    color: var(--faint);
+    color: var(--muted);
     padding: 0 8px;
     min-width: 86px;
     justify-content: flex-end;
