@@ -3,7 +3,9 @@ import { roomState, timerState } from '../stores.js'
 import { WS_SERVER_URL } from '../config.js'
 
 const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000]
-const MAX_RECONNECT_ATTEMPTS = RECONNECT_DELAYS.length
+// After the listed delays, keep trying every 5 s for about two minutes in
+// total. A relay restart or deploy can take longer than a few seconds.
+const MAX_RECONNECT_ATTEMPTS = 25
 
 export class SocketClient {
   constructor() {

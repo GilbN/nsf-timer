@@ -820,5 +820,28 @@ describe('TimerScheduler', () => {
       scheduler.restoreState({ phase: 'idle', programId: 'standard', stageIndex: 99, exerciseIndex: 0, seriesIndex: 0 })
       expect(scheduler.program).toBeNull()
     })
+
+    it('restores a running save from the previous version (no phaseEndsAt)', () => {
+      vi.setSystemTime(new Date('2026-04-17T10:00:00Z'))
+      scheduler.restoreState({
+        phase: 'loading', programId: 'standard', stageIndex: 1, exerciseIndex: 0, seriesIndex: 0,
+        phaseStartedAt: Date.parse('2026-04-17T09:59:40Z'), totalMs: 60_000, remainingMs: 60_000, targetVisible: false,
+      })
+      expect(scheduler.state.phase).toBe('loading')
+      expect(scheduler.state.remainingMs).toBe(40_000)
+      runPhase(40_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
+
+    it('resumes a paused save from the previous version (no pausedPhase)', () => {
+      scheduler.restoreState({
+        phase: 'paused', programId: 'standard', stageIndex: 1, exerciseIndex: 0, seriesIndex: 0,
+        totalMs: 60_000, remainingMs: 15_000, targetVisible: false,
+      })
+      scheduler.resume()
+      expect(scheduler.state.phase).toBe('loading')
+      runPhase(15_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
   })
 })

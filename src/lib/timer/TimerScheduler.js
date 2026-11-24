@@ -115,6 +115,9 @@ export class TimerScheduler {
         remainingMs: 0,
         targetVisible: false,
         phaseEndsAt: null,
+        pausedPhase: null,
+        isReshoot: false,
+        reshootPeerName: null,
         stoppedReason: savedState.stoppedReason ?? 'aborted',
       }
     } else if (remaining !== null) {
@@ -139,9 +142,7 @@ export class TimerScheduler {
   _segmentCompletion() {
     const stage = this.getCurrentStage()
     const exercise = this.getCurrentExercise()
-    const phase = this.state.phase === 'paused' ? this.state.pausedPhase : this.state.phase
-
-    if (phase === 'loading') return () => this._startShooting()
+    if (this.state.phase === 'loading') return () => this._startShooting()
     if (stage?.type === 'duell' && exercise?.targetVisibleTime) {
       const total = Math.ceil(exercise.shotsPerSeries / exercise.shotsPerShowing)
       const showing = this.state.duelShowingIndex ?? 0
@@ -524,6 +525,8 @@ export class TimerScheduler {
         phaseStartedAt: null,
         isReshoot: false,
         reshootPeerName: null,
+        phaseEndsAt: null,
+        pausedPhase: null,
         stageComplete: false,
         stoppedReason: null,
       })
@@ -557,6 +560,8 @@ export class TimerScheduler {
       phaseStartedAt: null,
       isReshoot: false,
       reshootPeerName: null,
+      phaseEndsAt: null,
+      pausedPhase: null,
       stageComplete: false,
       stoppedReason: null,
     })
@@ -571,6 +576,8 @@ export class TimerScheduler {
       targetVisible: false,
       isReshoot: false,
       reshootPeerName: null,
+      phaseEndsAt: null,
+      pausedPhase: null,
       stoppedReason: 'aborted',
     })
   }
