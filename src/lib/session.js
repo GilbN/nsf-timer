@@ -105,10 +105,9 @@ export function rememberRoom(extra = {}) {
   const room = get(roomState)
   if (!room.code || room.isSolo) return
   const saved = loadRoomState() || {}
-  const timer = get(timerState)
   addRoomToHistory({
     // Lets a host who rejoins from the list continue where the program was
-    timer: room.isHost && timer.programId ? timer : undefined,
+    timer: room.isHost ? hostTimerSnapshot(extra.programId) : undefined,
     code: room.code,
     isHost: room.isHost,
     isSpectator: room.isSpectator,
@@ -117,6 +116,28 @@ export function rememberRoom(extra = {}) {
     hostToken: session.host?.hostToken ?? saved.hostToken,
     ...extra,
   })
+}
+
+/**
+ * The host's position for the recent-rooms list. A series that was running
+ * when the host left is stored as stopped. Disconnecting closes the room,
+ * so a later rejoin must not start counting with nobody there.
+ * @param {string | undefined} programId
+ */
+function hostTimerSnapshot(programId) {
+  const timer = get(timerState)
+  if (!programId || timer.programId !== programId) return undefined
+  if (timer.phase !== 'loading' && timer.phase !== 'shooting') return timer
+  return {
+    ...timer,
+    phase: 'stopped',
+    remainingMs: 0,
+    targetVisible: false,
+    phaseEndsAt: null,
+    isReshoot: false,
+    reshootPeerName: null,
+    stoppedReason: 'aborted',
+  }
 }
 
 /** Tear down everything, forget the saved session and go back home. */

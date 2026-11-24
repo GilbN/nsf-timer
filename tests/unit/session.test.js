@@ -99,4 +99,22 @@ describe('rememberRoom', () => {
     rememberRoom()
     expect(loadRoomHistory()[0].timer).toBeUndefined()
   })
+
+  it('stores a running series as stopped, so a rejoin does not start counting', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, phase: 'shooting', programId: 'standard', stageIndex: 1, targetVisible: true, phaseEndsAt: Date.now() + 60_000 }))
+    rememberRoom({ programId: 'standard' })
+
+    const { timer } = loadRoomHistory()[0]
+    expect(timer.phase).toBe('stopped')
+    expect(timer.stoppedReason).toBe('aborted')
+    expect(timer.stageIndex).toBe(1)
+  })
+
+  it('does not store a timer from another program', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, programId: 'standard' }))
+    rememberRoom()
+    expect(loadRoomHistory()[0].timer).toBeUndefined()
+  })
 })

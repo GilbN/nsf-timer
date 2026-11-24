@@ -497,7 +497,7 @@ export class TimerScheduler {
     const exercise = this.getCurrentExercise()
     // States saved before pausedPhase existed: guess from the segment length
     const phase = this.state.pausedPhase
-      ?? (this.state.totalMs === (exercise?.loadingTime || 60) * 1000 ? 'loading' : 'shooting')
+      ?? (!this.state.targetVisible && this.state.totalMs === (exercise?.loadingTime || 60) * 1000 ? 'loading' : 'shooting')
     const remaining = this.state.remainingMs
 
     this.state = { ...this.state, phase, pausedPhase: null }
