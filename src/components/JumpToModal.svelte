@@ -3,6 +3,7 @@
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { session } from '../lib/session.js'
   import Modal from './Modal.svelte'
+  import Icon from './ui/Icon.svelte'
 
   let { program, onClose } = $props()
 
@@ -15,13 +16,19 @@
     const totalSeries = exs.reduce((s, e) => s + e.seriesCount, 0)
     const shots = exs[0].shotsPerSeries
     const times = [...new Set(exs.map(e => e.timePerSeries ?? e.targetVisibleTime))]
-    const timeStr = times.length === 1 ? `${times[0]}s` : `${Math.min(...times)}–${Math.max(...times)}s`
-    return `${totalSeries} × ${shots} — ${timeStr}`
+    const timeStr = times.length === 1 ? `${fmt(times[0])} s` : `${fmt(Math.min(...times))}–${fmt(Math.max(...times))} s`
+    return `${totalSeries} × ${shots}, ${timeStr}`
+  }
+
+  /** @param {number} s */
+  function fmt(s) {
+    return Number.isInteger(s) ? String(s) : String(Math.round(s * 10) / 10)
   }
 
   let selectedStage = $derived(program.stages[selectedStageIdx])
   let selectedExercise = $derived(selectedStage?.exercises[selectedExerciseIdx])
   let showExercisePicker = $derived((selectedStage?.exercises.length ?? 0) > 1)
+  let lang = $derived($preferences.lang)
 
   function selectStage(i) {
     selectedStageIdx = i
@@ -40,237 +47,87 @@
   }
 </script>
 
-<Modal {onClose} labelledby="jump-to-title">
-  <div class="modal-panel">
-    <h2 id="jump-to-title" class="modal-title">{$t('jumpToPosition')}</h2>
+<Modal variant="sheet" {onClose} labelledby="jump-to-title">
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <h2 id="jump-to-title">{$t('jumpToPosition')}</h2>
+      <span class="aside">{getLocalizedName(program.name, lang)}</span>
+    </div>
 
-    <!-- Stage selector -->
-    <div class="field">
-      <span class="field-label">{$t('stage')}</span>
-      <div class="option-grid stage-grid">
-        {#each program.stages as stage, i (i)}
+    <div class="key-grid stages" role="group" aria-label={$t('stage')}>
+      {#each program.stages as stage, i (i)}
+        <button
+          class="key opt"
+          class:key-white={selectedStageIdx === i}
+          aria-pressed={selectedStageIdx === i}
+          onclick={() => selectStage(i)}
+        >
+          <span>{getLocalizedName(stage.name, lang)}<small class="tnum">{stageSummary(stage)}</small></span>
+        </button>
+      {/each}
+    </div>
+
+    {#if showExercisePicker && selectedStage}
+      <span class="field-label">{$t('exercise')}</span>
+      <div class="key-grid" role="group" aria-label={$t('exercise')}>
+        {#each selectedStage.exercises as ex, i (i)}
           <button
-            class="option-btn stage-btn"
-            class:selected={selectedStageIdx === i}
-            class:trial-stage={stage.isTrialStage}
-            onclick={() => selectStage(i)}
+            class="key opt"
+            class:key-white={selectedExerciseIdx === i}
+            aria-pressed={selectedExerciseIdx === i}
+            onclick={() => selectExercise(i)}
           >
-            <span class="stage-name">{getLocalizedName(stage.name, $preferences.lang)}</span>
-            <span class="stage-detail">{stageSummary(stage)}</span>
+            <span>{$t('exercise')} {i + 1}<small class="tnum">{ex.seriesCount} × {ex.shotsPerSeries}, {fmt(ex.timePerSeries ?? ex.targetVisibleTime)} s</small></span>
           </button>
         {/each}
       </div>
-    </div>
-
-    <!-- Exercise selector (only when stage has >1 exercise) -->
-    {#if showExercisePicker && selectedStage}
-      <div class="field">
-        <span class="field-label">{$t('exercise')}</span>
-        <div class="option-grid exercise-grid">
-          {#each selectedStage.exercises as ex, i (i)}
-            <button
-              class="option-btn exercise-btn"
-              class:selected={selectedExerciseIdx === i}
-              onclick={() => selectExercise(i)}
-            >
-              <span class="ex-number">{$t('exercise')} {i + 1}</span>
-              <span class="ex-detail">{ex.seriesCount} × {ex.shotsPerSeries} &mdash; {ex.timePerSeries ?? ex.targetVisibleTime}s</span>
-            </button>
-          {/each}
-        </div>
-      </div>
     {/if}
 
-    <!-- Series selector -->
     {#if selectedExercise}
-      <div class="field">
-        <span class="field-label">{$t('series')}</span>
-        <div class="option-grid">
-          {#each { length: selectedExercise.seriesCount } as _, i (i)}
-            <button
-              class="option-btn"
-              class:selected={selectedSeriesIdx === i}
-              onclick={() => (selectedSeriesIdx = i)}
-            >
-              {i + 1}
-            </button>
-          {/each}
-        </div>
+      <span class="field-label">{$t('series')}</span>
+      <div class="numbers" role="group" aria-label={$t('series')}>
+        {#each { length: selectedExercise.seriesCount } as _, i (i)}
+          <button
+            class="key num tnum"
+            class:key-white={selectedSeriesIdx === i}
+            aria-pressed={selectedSeriesIdx === i}
+            onclick={() => (selectedSeriesIdx = i)}
+          >{i + 1}</button>
+        {/each}
       </div>
     {/if}
 
-    <!-- Actions -->
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick={onClose}>{$t('back')}</button>
-      <button class="btn-confirm" onclick={handleConfirm}>{$t('jumpTo')}</button>
+    <div class="key-grid foot">
+      <button class="key key-row key-center" onclick={onClose}><Icon name="arrow-left" />{$t('back')}</button>
+      <button class="key key-white key-row key-center" onclick={handleConfirm}><Icon name="check" />{$t('jumpTo')}</button>
     </div>
   </div>
 </Modal>
 
 <style>
-  .modal-panel {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-lg, var(--radius));
-    padding: 1.25rem;
-    width: min(90vw, 380px);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    font-size: 13px;
+  .opt {
+    min-height: 72px;
+    padding: 12px 16px;
+    justify-content: center;
+    font-size: 0.9375rem;
   }
 
-  .modal-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-    letter-spacing: 0.04em;
+  .numbers {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 8px;
   }
 
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .field-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .option-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  .option-btn {
-    background: var(--bg-surface);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius);
-    padding: 0.45rem 0.75rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
-    min-width: 2.5rem;
-  }
-
-  .stage-grid {
-    flex-direction: column;
-  }
-
-  .stage-btn {
-    display: flex;
-    justify-content: space-between;
+  .num {
+    min-height: 52px;
+    padding: 0;
     align-items: center;
-    width: 100%;
-    text-align: left;
+    justify-content: center;
+    border-radius: 16px;
+    font-size: 1.125rem;
+    font-weight: 800;
   }
 
-  .stage-name {
-    font-weight: 600;
-  }
-
-  .stage-detail {
-    font-size: 0.72rem;
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stage-btn.selected .stage-detail {
-    opacity: 0.85;
-  }
-
-  .exercise-grid {
-    flex-direction: column;
-  }
-
-  .exercise-btn {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    text-align: left;
-  }
-
-  .ex-number {
-    font-weight: 600;
-  }
-
-  .ex-detail {
-    font-size: 0.72rem;
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .exercise-btn.selected .ex-detail {
-    opacity: 0.85;
-  }
-
-  .option-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text-primary);
-  }
-
-  .option-btn.selected {
-    background: var(--accent);
-    color: #0d0d1a;
-    border-color: var(--accent);
-    font-weight: 700;
-  }
-
-  .option-btn.trial-stage {
-    color: var(--warning);
-    border-color: rgba(255, 181, 71, 0.25);
-  }
-
-  .option-btn.trial-stage.selected {
-    background: var(--warning);
-    border-color: var(--warning);
-    color: #0d0d1a;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    margin-top: 0.25rem;
-  }
-
-  .btn-secondary {
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    font-weight: 500;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius);
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-
-  .btn-secondary:hover {
-    opacity: 1;
-  }
-
-  .btn-confirm {
-    background: var(--accent);
-    color: #0d0d1a;
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0.45rem 1rem;
-    border-radius: var(--radius);
-    letter-spacing: 0.04em;
-    transition: opacity 0.15s;
-  }
-
-  .btn-confirm:hover {
-    opacity: 0.9;
-  }
+  .foot { margin-top: 4px; }
+  .foot .key { min-height: 56px; }
 </style>

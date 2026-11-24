@@ -1,21 +1,30 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { currentView, roomState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import { hostRoom, joinRoom as joinSessionRoom, startScheduler } from '../lib/session.js'
   import { unlockAudio } from '../lib/audio.js'
   import { saveRoomState, loadRoomHistory, clearRoomHistory } from '../lib/storage.js'
   import SettingsMenu from '../components/SettingsMenu.svelte'
+  import Modal from '../components/Modal.svelte'
+  import Icon from '../components/ui/Icon.svelte'
 
-  let joinCodeInput
+  /** @type {HTMLInputElement | undefined} */
+  let joinCodeInput = $state()
   let joinCode = $state('')
   let joinName = $state('')
   let joinLane = $state('')
   let error = $state('')
   let connecting = $state(false)
   let recentRooms = $state(loadRoomHistory())
-  let showDisplayForm = $state(false)
   let displayCode = $state('')
+
+  /**
+   * 'home' shows the ways in. 'join' and 'display' are the two code forms,
+   * joining as a shooter or opening the spectator screen.
+   * @type {'home' | 'join' | 'display'}
+   */
+  let mode = $state('home')
 
   const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
@@ -25,6 +34,17 @@
     (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
   let showInstallCard = $state(false)
+  let showInstallSheet = $state(false)
+
+  /** @param {'home' | 'join' | 'display'} next */
+  async function openMode(next) {
+    error = ''
+    mode = next
+    if (next !== 'home') {
+      await tick()
+      joinCodeInput?.focus()
+    }
+  }
 
   async function createRoom() {
     unlockAudio()
@@ -43,7 +63,7 @@
 
   async function joinRoom() {
     if (!joinCode.trim() || joinCode.trim().length < 4) {
-      error = 'Enter a 4-character room code'
+      error = $t('enterCodeError')
       return
     }
     if (!joinName.trim()) {
@@ -104,7 +124,7 @@
   async function joinDisplay() {
     const code = displayCode.trim().toUpperCase()
     if (!code || code.length < 4) {
-      error = 'Enter a 4-character room code'
+      error = $t('enterCodeError')
       return
     }
     unlockAudio()
@@ -121,6 +141,14 @@
     }
   }
 
+  function submit() {
+    // Enter can fire while a join is still in flight; a second join for the
+    // same lane would be rejected and its cleanup could undo the first
+    if (connecting) return
+    if (mode === 'display') joinDisplay()
+    else joinRoom()
+  }
+
   function handleClearHistory() {
     clearRoomHistory()
     recentRooms = []
@@ -130,8 +158,9 @@
     const params = new URLSearchParams(window.location.search)
     const room = params.get('room')
     if (room) {
-      joinCode = room.toUpperCase().slice(0, 4)
+      joinCode = cleanCode(room)
       history.replaceState({}, '', window.location.pathname)
+      mode = 'join'
       setTimeout(() => joinCodeInput?.focus(), 50)
     }
 
@@ -146,7 +175,13 @@
     await prompt.prompt()
     await prompt.userChoice
     showInstallCard = false
+    showInstallSheet = false
     window.__pwaInstallPrompt = null
+  }
+
+  function dismissInstall() {
+    showInstallSheet = false
+    showInstallCard = false
   }
 
   function openStopwatch() {
@@ -171,563 +206,482 @@
     const days = Math.floor(hrs / 24)
     return `${days}d`
   }
+
+  /** Code inputs keep only letters and digits, upper case. */
+  function cleanCode(value) {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
+  }
 </script>
 
 <div class="view home-view">
-  <div class="header">
-    <div class="wordmark">
-      <!-- Target ring icon -->
-      <svg class="wordmark-icon" viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-        <circle cx="16" cy="16" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
-        <circle cx="16" cy="16" r="4" stroke="currentColor" stroke-width="1.5"/>
-        <circle cx="16" cy="16" r="1.5" fill="currentColor"/>
-      </svg>
-      <span class="wordmark-text">{$t('appName')}</span>
-    </div>
-    <div class="header-actions">
-      <SettingsMenu />
-    </div>
-  </div>
+  <!-- Live regions stay mounted so screen readers hear each change; the
+       visible status lines below are for sighted users only -->
+  <div class="sr-only" role="status">{connecting ? `${$t('connecting')}…` : ''}</div>
+  <div class="sr-only" role="alert">{!connecting && error ? error : ''}</div>
 
-  <p class="tagline">{$t('tagline')}</p>
-
-  <div class="actions">
-    <button class="btn-primary btn-large btn-create" onclick={createRoom} disabled={connecting}>
-      {$t('createRoom')}
-    </button>
-
-    <div class="divider-row">
-      <span class="divider-line"></span>
-      <span class="divider-label">{$t('join')}</span>
-      <span class="divider-line"></span>
-    </div>
-
-    <div class="join-section">
-      <div class="join-row">
-        <input
-          type="text"
-          bind:this={joinCodeInput}
-          bind:value={joinCode}
-          placeholder={$t('enterCode')}
-          maxlength="4"
-          class="join-input"
-          onkeydown={(e) => e.key === 'Enter' && joinRoom()}
-          style="text-transform: uppercase"
-        />
-        <button class="btn-secondary btn-large" onclick={joinRoom} disabled={connecting}>
-          {$t('join')}
-        </button>
-      </div>
-      <div class="join-details">
-        <input
-          type="text"
-          bind:value={joinName}
-          placeholder={$t('yourName')}
-          class="join-detail-input"
-          autocomplete="name"
-        />
-        <input
-          type="text"
-          bind:value={joinLane}
-          placeholder={$t('laneNumber')}
-          maxlength="3"
-          class="join-detail-input lane-input"
-          inputmode="numeric"
-          autocomplete="off"
-        />
-      </div>
-    </div>
-
-    <div class="ghost-row">
-      <button class="btn-ghost" onclick={startSolo}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-        </svg>
-        {$t('soloMode')}
-      </button>
-      <button class="btn-ghost" onclick={openStopwatch}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="13" r="8"/>
-          <polyline points="12 9 12 13 14.5 15"/>
-          <path d="M9 3h6M12 3v2"/>
-        </svg>
-        {$t('stopwatch')}
-      </button>
-    </div>
-
-    <button class="btn-ghost display-btn" onclick={() => { showDisplayForm = !showDisplayForm; error = '' }}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <line x1="8" y1="21" x2="16" y2="21"/>
-        <line x1="12" y1="17" x2="12" y2="21"/>
-      </svg>
-      {$t('spectatorScreen')}
-    </button>
-
-    {#if showDisplayForm}
-      <div class="display-form">
-        <div class="display-hint">{$t('watchDisplayHint')}</div>
-        <div class="join-row">
-          <input
-            type="text"
-            bind:value={displayCode}
-            placeholder={$t('enterCode')}
-            maxlength="4"
-            class="join-input"
-            onkeydown={(e) => e.key === 'Enter' && joinDisplay()}
-            style="text-transform: uppercase"
-          />
-          <button class="btn-secondary btn-large" onclick={joinDisplay} disabled={connecting}>
-            {$t('watchDisplay')}
+  {#if mode === 'home'}
+    <div class="top-bar">
+      <div class="cluster">
+        {#if showInstallCard}
+          <button class="pill install-pill" onclick={() => (showInstallSheet = true)}>
+            <Icon name="download" />{$t('installApp')}
           </button>
-        </div>
-      </div>
-    {/if}
-
-    {#if showInstallCard}
-      <div class="install-card">
-        {#if isIos}
-          <div class="install-header">
-            <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v13M7 11l5 5 5-5"/>
-              <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
-            </svg>
-            <span class="install-text">{$t('installApp')}</span>
-            <button class="btn-ghost-sm install-close" onclick={() => showInstallCard = false}>✕</button>
-          </div>
-          <div class="install-ios-row">
-            <span class="install-hint">
-              <svg class="safari-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                <polyline points="16 6 12 2 8 6"/>
-                <line x1="12" y1="2" x2="12" y2="15"/>
-              </svg>
-              {$t('installIosHint')}
-            </span>
-          </div>
-        {:else}
-          <div class="install-header">
-            <svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v13M7 11l5 5 5-5"/>
-              <path d="M3 18h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"/>
-            </svg>
-            <span class="install-text">{$t('installApp')}</span>
-            <button class="btn-primary btn-install" onclick={installApp}>
-              {$t('installApp')}
-            </button>
-            <button class="btn-ghost-sm install-close" onclick={() => showInstallCard = false}>✕</button>
-          </div>
         {/if}
       </div>
-    {/if}
-  </div>
+      <SettingsMenu />
+    </div>
 
-  {#if recentRooms.length > 0}
-    <div class="recent-rooms">
-      <div class="recent-header">
-        <span class="recent-label">{$t('recentRooms')}</span>
-        <button class="btn-ghost-sm" onclick={handleClearHistory}>{$t('clear')}</button>
+    <div class="lcd well">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="16" cy="16" r="13" opacity=".4" />
+          <circle cx="16" cy="16" r="8" opacity=".7" />
+          <circle cx="16" cy="16" r="3" fill="currentColor" stroke="none" />
+        </svg>
+        <h1>{$t('appName')}</h1>
       </div>
-      <div class="recent-list">
-        {#each recentRooms as room (room.code)}
-          <button class="recent-room-card" onclick={() => rejoinRoom(room)} disabled={connecting}>
-            <span class="recent-code">{room.code}</span>
-            <span class="recent-meta">
-              {room.isHost ? $t('host') : room.isSpectator ? $t('spectator') : $t('client')}
-              {#if room.joinedAt}· {timeAgo(room.joinedAt)}{/if}
-            </span>
-          </button>
-        {/each}
+      <p class="tagline muted">{$t('tagline')}</p>
+
+      <div class="recent">
+        <div class="recent-head">
+          <span class="muted">{$t('recentRooms')}</span>
+          {#if recentRooms.length > 0}
+            <button class="clear muted" onclick={handleClearHistory}>{$t('clear')}</button>
+          {/if}
+        </div>
+        {#if recentRooms.length > 0}
+          <div class="recent-list">
+            {#each recentRooms as room (room.code + (room.joinedAt ?? ''))}
+              <button class="recent-row" onclick={() => rejoinRoom(room)} disabled={connecting}>
+                <span class="code tnum">{room.code}</span>
+                <span class="who">{room.isHost ? $t('host') : room.isSpectator ? $t('spectator') : $t('client')}</span>
+                {#if room.joinedAt}<span class="ago muted tnum">{timeAgo(room.joinedAt)}</span>{/if}
+                <Icon name="chevron-right" />
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <p class="empty muted">{$t('noRecentRooms')}</p>
+        {/if}
       </div>
     </div>
-  {/if}
 
-  {#if error}
-    <div class="status-msg error">{error}</div>
-  {/if}
+    <!-- Layout only: a column of its own in landscape, invisible in portrait -->
+    <div class="keys-col">
+      {#if connecting || error}
+        {#if connecting}
+          <div class="status" aria-hidden="true"><span class="spinner"></span>{$t('connecting')}…</div>
+        {:else}
+          <div class="status" aria-hidden="true"><span class="led red"></span><span class="err">{error}</span></div>
+        {/if}
+      {/if}
 
-  {#if connecting}
-    <div class="status-msg connecting">
-      <span class="spinner"></span>
-      {$t('connecting')}…
+      <div class="pad">
+        <button class="key key-white" onclick={createRoom} disabled={connecting}>
+          <Icon name="plus" />
+          <span>{$t('createRoom')}<small>{$t('createRoomHint')}</small></span>
+        </button>
+        <button class="key" onclick={() => openMode('join')} disabled={connecting}>
+          <Icon name="arrow-right" />
+          <span>{$t('join')}<small>{$t('roomCode')}</small></span>
+        </button>
+        <button class="key" onclick={startSolo} disabled={connecting}>
+          <Icon name="user" />
+          <span>{$t('soloMode')}</span>
+        </button>
+        <button class="key" onclick={openStopwatch} disabled={connecting}>
+          <Icon name="stopwatch" />
+          <span>{$t('stopwatch')}</span>
+        </button>
+        <button class="key key-row span-2" onclick={() => openMode('display')} disabled={connecting}>
+          <Icon name="screen" />{$t('spectatorScreen')}
+        </button>
+      </div>
+    </div>
+  {:else}
+    <div class="top-bar">
+      <button class="btn" onclick={() => openMode('home')} disabled={connecting}>
+        <Icon name="arrow-left" />{$t('back')}
+      </button>
+      <SettingsMenu />
+    </div>
+
+    <form class="form well" onsubmit={(e) => { e.preventDefault(); submit() }} novalidate>
+      <div class="seg" role="group" aria-label={$t('joinRoom')}>
+        <button type="button" aria-pressed={mode === 'join'} class:on={mode === 'join'} disabled={connecting} onclick={() => openMode('join')}>
+          {$t('join')}
+        </button>
+        <button type="button" aria-pressed={mode === 'display'} class:on={mode === 'display'} disabled={connecting} onclick={() => openMode('display')}>
+          {$t('spectator')}
+        </button>
+      </div>
+
+      <div>
+        <label class="field-label" for="room-code">{$t('roomCode')}</label>
+        {#if mode === 'join'}
+          <input
+            id="room-code"
+            class="input code-input tnum"
+            type="text"
+            bind:this={joinCodeInput}
+            value={joinCode}
+            oninput={(e) => { joinCode = cleanCode(e.currentTarget.value); e.currentTarget.value = joinCode }}
+            placeholder={$t('enterCode')}
+            maxlength="4"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            aria-invalid={!!error && joinCode.trim().length < 4}
+          />
+        {:else}
+          <input
+            id="room-code"
+            class="input code-input tnum"
+            type="text"
+            bind:this={joinCodeInput}
+            value={displayCode}
+            oninput={(e) => { displayCode = cleanCode(e.currentTarget.value); e.currentTarget.value = displayCode }}
+            placeholder={$t('enterCode')}
+            maxlength="4"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            aria-invalid={!!error && displayCode.trim().length < 4}
+          />
+        {/if}
+      </div>
+
+      {#if mode === 'join'}
+        <div class="two">
+          <div>
+            <label class="field-label" for="join-name">{$t('yourName')}</label>
+            <input
+              id="join-name"
+              class="input"
+              type="text"
+              bind:value={joinName}
+              placeholder={$t('name')}
+              autocomplete="name"
+              aria-invalid={!!error && !joinName.trim() && joinCode.trim().length === 4}
+            />
+          </div>
+          <div>
+            <label class="field-label" for="join-lane">{$t('laneNumber')}</label>
+            <input
+              id="join-lane"
+              class="input tnum"
+              type="text"
+              bind:value={joinLane}
+              placeholder="–"
+              maxlength="3"
+              inputmode="numeric"
+              autocomplete="off"
+              aria-invalid={!!error && !!joinName.trim() && !joinLane.trim()}
+            />
+          </div>
+        </div>
+      {:else}
+        <p class="hint muted">{$t('watchDisplayHint')}</p>
+      {/if}
+
+      {#if connecting}
+        <p class="form-status" aria-hidden="true"><span class="spinner"></span>{$t('connecting')}…</p>
+      {:else if error}
+        <p class="form-status" aria-hidden="true"><span class="led red"></span>{error}</p>
+      {/if}
+
+      <!-- Lets Enter/Go submit; not display:none, which some browsers skip -->
+      <button type="submit" class="sr-only" aria-hidden="true" tabindex="-1"></button>
+    </form>
+
+    <div class="form-keys">
+      <button class="key key-white" onclick={submit} disabled={connecting}>
+        <Icon name={mode === 'display' ? 'screen' : 'arrow-right'} />
+        <span>
+          {mode === 'display' ? $t('watchDisplay') : $t('join')}
+          {#if mode === 'join' && (joinName.trim() || joinLane.trim())}
+            <small>{[joinLane.trim() && `${$t('lane')} ${joinLane.trim()}`, joinName.trim()].filter(Boolean).join(', ')}</small>
+          {:else}
+            <small>{mode === 'display' ? $t('spectatorScreen') : $t('joinRoom')}</small>
+          {/if}
+        </span>
+      </button>
     </div>
   {/if}
 </div>
 
+{#if showInstallSheet}
+  <Modal variant="sheet" onClose={() => (showInstallSheet = false)} labelledby="install-title">
+    <div class="sheet-panel">
+      <div class="sheet-head"><h2 id="install-title">{$t('installApp')}</h2></div>
+      {#if isIos}
+        <p class="install-hint">
+          <Icon name="share" />{$t('installIosHint')}
+        </p>
+      {/if}
+      <div class="key-grid">
+        <button class="key key-row" onclick={dismissInstall}><Icon name="x" />{$t('later')}</button>
+        {#if isIos}
+          <button class="key key-row key-white" onclick={() => (showInstallSheet = false)}><Icon name="check" />OK</button>
+        {:else}
+          <button class="key key-row key-white" onclick={installApp}><Icon name="download" />{$t('installApp')}</button>
+        {/if}
+      </div>
+    </div>
+  </Modal>
+{/if}
+
 <style>
-  .home-view {
-    gap: 1.25rem;
-    overflow-y: auto;
-    overflow-x: hidden;
+  /* ── Home ── */
+  .lcd {
+    margin: 6px var(--pad-x) 0;
+    padding: 18px 20px 12px;
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 340px;
+    overflow: hidden;
   }
 
-  /* Center content vertically when it fits, but allow scrolling to the top
-     when it doesn't. justify-content: center would clip overflow above the
-     viewport; auto margins collapse to 0 once the container overflows. */
-  .home-view > :first-child { margin-top: auto; }
-  .home-view > :last-child  { margin-bottom: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; flex: none; }
+  .brand h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+  .tagline { font-size: 0.8125rem; font-weight: 600; margin: 4px 0 14px; }
 
-  /* ── Header ── */
-  .header {
+  .recent { display: flex; flex-direction: column; min-height: 0; }
+
+  .recent-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding-bottom: 6px;
   }
 
-  .header-actions {
+  .clear { font-size: 0.75rem; font-weight: 700; padding: 6px 0 6px 12px; min-height: 44px; }
+
+  .recent-list { overflow-y: auto; min-height: 0; }
+
+  .recent-row {
     display: flex;
-    gap: 0.4rem;
     align-items: center;
-  }
-
-  .wordmark {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .wordmark-icon {
-    width: 28px;
-    height: 28px;
-    color: var(--accent);
-    flex-shrink: 0;
-  }
-
-  .wordmark-text {
-    font-family: var(--font-mono);
-    font-size: 1.15rem;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    color: var(--text-primary);
-  }
-
-  .tagline {
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    text-align: center;
-    margin-top: -0.75rem;
-  }
-
-  /* ── Actions ── */
-  .actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.65rem;
-  }
-
-  .btn-create {
+    gap: 12px;
     width: 100%;
-    font-size: 1rem;
-    letter-spacing: 0.06em;
+    height: 46px;
+    border-top: 1px solid var(--line);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: left;
   }
 
-  .divider-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin: 0.1rem 0;
-  }
+  .recent-row .code { font-size: 1.0625rem; font-weight: 800; letter-spacing: 0.04em; width: 58px; flex: none; }
+  .recent-row .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-row :global(svg) { width: 16px; height: 16px; color: var(--faint); flex: none; }
+  .recent-row:disabled { opacity: 0.5; }
 
-  .divider-line {
-    flex: 1;
-    height: 1px;
-    background: var(--bg-surface);
-  }
+  .empty { font-size: 0.8125rem; font-weight: 600; padding: 10px 0; border-top: 1px solid var(--line); }
 
-  .divider-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.5;
-  }
-
-  .join-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .join-row {
-    display: flex;
-    gap: 0.4rem;
-    min-width: 0;
-  }
-
-  .join-row .btn-secondary {
-    flex-shrink: 0;
-    white-space: nowrap;
-    font-size: 0.95rem;
-  }
-
-  .join-input {
-    flex: 1;
-    min-width: 0;
-    font-family: var(--font-mono);
-    font-size: 1.3rem;
-    text-align: center;
-    letter-spacing: 0.25em;
-    font-weight: 900;
-  }
-
-  .join-details {
-    display: flex;
-    gap: 0.4rem;
-    min-width: 0;
-  }
-
-  .join-detail-input {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.9rem;
-    padding: 0.6rem 0.75rem;
-  }
-
-  .lane-input {
-    flex: 0 0 76px;
-    text-align: center;
-    font-family: var(--font-mono);
-    font-weight: 700;
-  }
-
-  .btn-ghost {
+  .status {
+    margin: 10px var(--pad-x) 0;
+    min-height: 44px;
+    padding: 10px 16px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: var(--radius);
-    padding: 0.6rem 1.25rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    width: 100%;
-    transition: color 0.15s, border-color 0.15s;
+    gap: 10px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--well);
+    box-shadow: var(--well-shadow);
+    flex: none;
   }
 
-  .btn-ghost svg {
-    width: 1.1em;
-    height: 1.1em;
-    flex-shrink: 0;
+  .status .err { color: var(--fg); }
+
+  .pad {
+    flex: 1 1 340px;
+    min-height: 300px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1.3fr 1fr minmax(60px, auto);
+    gap: 10px;
+    padding: 12px var(--pad-x) 0;
   }
 
-  .btn-ghost:hover {
-    color: var(--text-primary);
-    border-color: rgba(255,255,255,0.15);
-  }
+  .keys-col { display: contents; }
 
-  .ghost-row {
-    display: flex;
-    gap: 0.4rem;
-  }
+  .pad .span-2 { grid-column: span 2; }
+  .pad .key span { display: block; }
 
-  .ghost-row .btn-ghost {
-    flex: 1;
-  }
+  .install-pill { cursor: pointer; }
 
-  /* ── Recent rooms ── */
-  .recent-rooms {
+  /* ── Join and spectator form ── */
+  .form {
+    margin: 6px var(--pad-x) 0;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 16px;
   }
 
-  .recent-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 16px;
+    background: #000;
   }
 
-  .recent-label {
-    font-size: 0.65rem;
+  .seg button {
+    height: 40px;
+    border-radius: 12px;
+    font-size: 0.875rem;
     font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.6;
+    color: var(--muted);
   }
 
-  .btn-ghost-sm {
-    font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
-    background: transparent;
-    color: var(--text-secondary);
-    opacity: 0.5;
-    border-radius: var(--radius);
-    transition: opacity 0.15s, color 0.15s;
-  }
+  .seg button.on { background: var(--key); color: var(--fg); box-shadow: var(--key-shadow); }
 
-  .btn-ghost-sm:hover {
-    color: var(--danger);
-    opacity: 1;
-  }
-
-  .recent-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .recent-room-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.6rem 0.85rem;
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255,255,255,0.04);
-    border-left: 2px solid transparent;
-    border-radius: 0 var(--radius) var(--radius) 0;
-    transition: border-color 0.15s;
-  }
-
-  .recent-room-card:hover {
-    border-left-color: var(--accent);
-    border-color: rgba(255,255,255,0.07);
-    border-left-color: var(--accent);
-  }
-
-  .recent-code {
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    color: var(--accent);
-  }
-
-  .recent-meta {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-  }
-
-  /* ── Status messages ── */
-  .status-msg {
+  .code-input {
+    height: 76px;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: 0.4em;
+    padding-left: calc(18px + 0.4em);
+    text-transform: uppercase;
   }
 
-  .error { color: var(--danger); }
+  .code-input::placeholder { font-size: 1rem; letter-spacing: 0; font-weight: 600; }
 
-  .connecting {
-    color: var(--warning);
+  .two { display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
+
+  .hint { font-size: 0.875rem; font-weight: 600; line-height: 1.45; padding: 0 4px; }
+
+  .form-status {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+    gap: 10px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding: 0 4px;
   }
 
-  .spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255, 181, 71, 0.25);
-    border-top-color: var(--warning);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    flex-shrink: 0;
+  .form-keys {
+    margin-top: auto;
+    padding: 12px var(--pad-x) 0;
+    display: grid;
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  .form-keys .key { min-height: clamp(96px, 16dvh, 140px); }
+  .form-keys .key span { display: block; }
 
-  .install-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.75rem 1rem;
-    background: rgba(0, 230, 118, 0.06);
-    border: 1px solid rgba(0, 230, 118, 0.2);
-    border-radius: var(--radius);
-  }
-
-  .install-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .install-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--accent);
-    flex-shrink: 0;
-  }
-
-  .install-text {
-    flex: 1;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .install-close {
-    flex-shrink: 0;
-  }
-
-  .install-ios-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding-left: calc(20px + 0.5rem);
-  }
-
+  /* ── Install sheet ── */
   .install-hint {
-    flex: 1;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-  }
-
-  .safari-share-icon {
-    display: inline-block;
-    vertical-align: middle;
-    width: 1.1em;
-    height: 1.1em;
-    margin-right: 0.2em;
-    color: var(--accent);
-  }
-
-  .btn-install {
     display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.8rem;
-    padding: 0.4rem 0.9rem;
-    min-height: unset;
-    flex-shrink: 0;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 4px 4px 8px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--muted);
   }
 
+  .install-hint :global(svg) { width: 22px; height: 22px; flex: none; color: var(--fg); }
 
-  /* ── Display screen ── */
-  .display-btn {
-    border-color: rgba(91, 141, 217, 0.2);
-    color: var(--phase-paused);
+  @media (max-height: 640px) {
+    .lcd { max-height: 220px; padding-top: 14px; }
+    .tagline { margin-bottom: 8px; }
+    .pad { min-height: 260px; grid-template-rows: 1.2fr 1fr minmax(52px, auto); }
   }
 
-  .display-btn:hover {
-    color: var(--phase-paused);
-    border-color: rgba(91, 141, 217, 0.4);
+  /*
+   * Landscape: the display panel on the left, the keypad on the right.
+   * The spacer rows above and below centre the pair once the keypad row
+   * reaches its cap, so keys never stretch into tall pillars.
+   */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .home-view {
+      max-width: 1180px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+      grid-template-rows: auto minmax(0, 1fr) minmax(min-content, 680px) minmax(0, 1fr);
+      grid-template-areas:
+        'bar bar'
+        '. .'
+        'lcd keys'
+        '. .';
+    }
+
+    .top-bar { grid-area: bar; }
+
+    .lcd {
+      grid-area: lcd;
+      margin: 6px 0 0 var(--pad-x);
+      max-height: none;
+      padding: 26px 26px 14px;
+    }
+
+    .mark { width: 36px; height: 36px; }
+    .brand { gap: 12px; }
+    .brand h1 { font-size: 1.625rem; }
+    .tagline { font-size: 0.875rem; margin: 6px 0 18px; }
+
+    /* The list sits at the foot of the panel, under the brand */
+    .recent { margin-top: auto; }
+
+    .keys-col {
+      grid-area: keys;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .status { margin: 6px var(--pad-x) 0 12px; }
+
+    .pad {
+      min-height: 240px;
+      padding: 6px var(--pad-x) 0 12px;
+      grid-template-rows: 1.3fr 1fr minmax(60px, auto);
+    }
+
+    /* Join and spectator: the form on the left, its key beside it */
+    .home-view:has(> .form) {
+      max-width: 920px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1.4fr);
+      grid-template-areas:
+        'bar bar'
+        '. .'
+        'form keys'
+        '. .';
+    }
+
+    .form { grid-area: form; margin: 6px 0 0 var(--pad-x); }
+
+    .form-keys {
+      grid-area: keys;
+      margin-top: 0;
+      padding: 6px var(--pad-x) 0 12px;
+    }
+
+    .form-keys .key { min-height: 140px; }
   }
 
-  .display-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: rgba(91, 141, 217, 0.05);
-    border: 1px solid rgba(91, 141, 217, 0.15);
-    border-radius: var(--radius);
-  }
-
-  .display-hint {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.01em;
+  @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
+    .lcd { padding: 16px 20px 8px; }
+    .mark { width: 28px; height: 28px; }
+    .brand h1 { font-size: 1.25rem; }
+    .tagline { font-size: 0.8125rem; margin: 4px 0 8px; }
+    .recent-row { height: 42px; }
+    .pad { grid-template-rows: 1.2fr 1fr minmax(52px, auto); }
+    .form { gap: 12px; padding: 12px; }
+    .code-input { height: 60px; font-size: 1.875rem; }
   }
 </style>

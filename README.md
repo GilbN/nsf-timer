@@ -23,24 +23,39 @@
 
 ## Features
 
-- **Built-in NSF programs** — Fine/Heavy Pistol, Standard, Silhouette, NAIS, Rapid Fire with full stage/series timing
-- **Custom programs** — Create, edit, and delete your own competition programs
-- **Multi-device sync** — Host creates a room, shooters join by 4-character code. Timer state syncs in real-time via WebSocket
-- **Precision, Rapid & Duel modes** — Countdown timers for precision stages, hidden/visible cycling for rapid-fire and duel stages
-- **Malfunction handling** — Track jams per shooter (max 2 per program, 1 per stage) with reshoot support
-- **Solo mode** — Run a full competition program locally without creating a room
-- **Spectator mode** — View-only mode for spectators to follow the competition timer
-- **Bilingual** — Norwegian and English
-- **Offline-capable PWA** — Install to home screen, works without internet after first load
-- **Standalone stopwatch** — Simple stopwatch mode independent of the competition system
-- **Settings** — Text scaling, sound toggle, screen wake lock, countdown format
+- **Built-in NSF programs.** Fine/Heavy Pistol, Standard, Silhouette, NAIS and Rapid Fire, with full stage and series timing.
+- **Custom programs.** Create, edit and delete your own programs. Stage types are precision, rapid and duel.
+- **Multi-device sync.** The host creates a room and shooters join with a 4-character code. Timer state syncs in real time over WebSocket.
+- **Malfunction handling.** Tracks malfunctions per shooter (max 2 per program, 1 per stage) and starts reshoots.
+- **Solo mode.** Run a full program on one device without a room.
+- **Spectator screen.** A view with no controls for a monitor or tablet at the range, laid out for landscape or portrait.
+- **Stopwatch.** Counts up, or down from a time you set.
+- **Offline PWA.** Install it to the home screen. The app and its fonts are cached, so solo mode and the stopwatch work without internet after the first load. Shared rooms need a connection to the relay server.
+- **Norwegian and English.**
+- **Settings.** Sound, screen wake lock, text size, language, and countdown and stopwatch formats.
+
+## The screen
+
+Every screen is a recessed display on top with large keys underneath, in black, white and greys. The white key is always the one to press next, and its small text says what it starts.
+
+A lamp strip along the top of the display shows whether to shoot:
+
+| Lamp | Display | Meaning |
+|------|---------|---------|
+| Off | Dark | Nothing is running |
+| Red | Dark | Loading, targets turned away (Klar / Attention), paused or stopped |
+| Green | White | Targets facing the shooters (Ild / Fire) |
+
+Because the display also turns white on Ild, the signal still reads for shooters who can't tell red from green, and from across the firing line. If a shooter's or spectator's connection drops, the lamp goes off and the display stays dark until the timer state is live again.
+
+Change program, jump to stage, refresh and disconnect sit in the ⋯ menu, so the timer screen only shows what you press during a match. Dialogs and pickers open as bottom sheets within thumb reach.
 
 ## How it works
 
-1. **Host** creates a room and selects a shooting program
-2. **Shooters** join with the room code, their name, and lane number
-3. Host controls the timer — start, pause, stop, reset
-4. All connected devices display the synchronized countdown in real-time
+1. The **host** creates a room and picks a program.
+2. **Shooters** join with the room code, their name and lane number.
+3. The host runs the timer: start, pause, stop, next series, reset.
+4. Every connected phone and spectator screen shows the same countdown and lamp.
 
 ## Self-hosting with Docker
 
@@ -175,10 +190,22 @@ The dev server proxies `/ws` to `localhost:8080`. Start the WebSocket relay serv
 cd server && npm install && npm run dev
 ```
 
+If port 8080 is taken, start both with the same `WS_PORT`, for example `WS_PORT=8091`.
+
+Checks:
+
+```bash
+npm test          # unit and integration tests (Vitest)
+npm run check     # svelte-check type checking
+npm run lint      # ESLint
+```
+
 ## Tech stack
 
-- [Svelte 5](https://svelte.dev/) — UI framework
-- [Vite](https://vite.dev/) — Build tool with HMR
-- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) — Service worker & manifest generation
-- [ws](https://github.com/websockets/ws) — WebSocket relay server (Node.js)
-- [Nginx](https://nginx.org/) — Static file serving & WebSocket proxy (Docker)
+- [Svelte 5](https://svelte.dev/) for the UI
+- [Vite](https://vite.dev/) to build and serve it
+- [Tailwind CSS v4](https://tailwindcss.com/) for the design tokens in `src/styles/global.css`
+- [Manrope](https://fontsource.org/fonts/manrope), self-hosted through Fontsource so it works offline
+- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) for the service worker and manifest
+- [ws](https://github.com/websockets/ws) for the WebSocket relay server (Node.js)
+- [Nginx](https://nginx.org/) to serve the static files and proxy WebSockets in Docker

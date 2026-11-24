@@ -21,10 +21,17 @@ function remainingFromSaved(saved) {
  * series skip one. A reshoot of the program's last series is the
  * exception. 'programComplete' hides Restart, and the host should still
  * be able to rerun the reshoot they stopped.
+ *
+ * A reshoot started before anyone shot the current series (from idle,
+ * after a jump) recorded null. Return null too, as a finished reshoot
+ * does: Next series then runs that unshot series instead of skipping it.
+ * Saved states from before preReshootStoppedReason existed have
+ * undefined and keep the old 'aborted'.
  */
 export function interruptedReason(state) {
   if (!state.isReshoot) return 'aborted'
   const before = state.preReshootStoppedReason
+  if (before === null) return null
   return before && before !== 'programComplete' ? before : 'aborted'
 }
 

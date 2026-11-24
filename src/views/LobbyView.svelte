@@ -14,6 +14,8 @@
   let showEditor = $state(false)
   let editingProgram = $state(null)
 
+  let peerCount = $derived($roomState.connectedPeers.length)
+
   function selectProgram(programId) {
     startScheduler(programId)
     saveRoomState({
@@ -45,25 +47,39 @@
     rememberRoom()
     endSession()
   }
+
+  // Koble fra lives in the menu, away from the program keys
+  let menuActions = $derived([
+    { id: 'disconnect', label: $t('disconnect'), icon: 'logout', onSelect: disconnect, danger: true },
+  ])
 </script>
 
 <div class="view lobby-view">
   <div class="top-bar">
-    {#if $roomState.isSolo}
-      <div class="solo-badge">{$t('soloMode')}</div>
-    {:else}
-      <div class="top-bar-left">
+    <div class="cluster">
+      {#if $roomState.isSolo}
+        <span class="pill">{$t('soloMode')}</span>
+      {:else}
         <RoomCode code={$roomState.code ?? ''} />
-        <ConnectionStatus status="connected" />
-      </div>
-    {/if}
-    <SettingsMenu />
+        <ConnectionStatus status="connected" variant="pill" />
+      {/if}
+    </div>
+    <SettingsMenu actions={menuActions} />
   </div>
 
-  {#if $roomState.connectedPeers.length > 0}
-    <div class="peer-pill">
-      <span class="peer-dot"></span>
-      {$roomState.connectedPeers.length} {$t('peers')}
+  {#if !showEditor && !$roomState.isSolo}
+    <!-- The code is set large so shooters can read it off the host's phone -->
+    <div class="room well">
+      <span class="label muted">{$t('roomCode')}</span>
+      <span class="code tnum">{$roomState.code ?? ''}</span>
+      <span class="peers">
+        <span class="led" class:off={peerCount === 0}></span>
+        {#if peerCount > 0}
+          <span class="tnum">{peerCount}</span> {$t('peers').toLowerCase()}
+        {:else}
+          <span class="muted">{$t('noPeers')}</span>
+        {/if}
+      </span>
     </div>
   {/if}
 
@@ -74,84 +90,98 @@
       <ProgramPicker onSelect={selectProgram} onCustom={() => (showEditor = true)} onEdit={handleEdit} />
     {/if}
   </div>
-
-  <button class="btn-leave" onclick={disconnect}>
-    {$t('disconnect')}
-  </button>
 </div>
 
 <style>
-  .lobby-view {
-    gap: 0.75rem;
-  }
-
-  .top-bar {
+  .room {
+    margin: 4px var(--pad-x) 14px;
+    padding: 16px 20px 18px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 2px;
+    flex: none;
+    container-type: inline-size;
+    overflow: hidden;
   }
 
-  .solo-badge {
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    color: var(--accent);
-    padding: 0.35rem 0.7rem;
-    background: var(--bg-surface);
-    border: 1px solid rgba(0, 230, 118, 0.2);
-    border-radius: var(--radius);
-    text-transform: uppercase;
-  }
+  .label { font-size: 0.75rem; font-weight: 700; }
 
-  .peer-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+  /* Capped so WWWW still fits a 320px phone at the largest text size */
+  .code {
+    font-size: min(22cqw, 3.25rem);
+    font-weight: 800;
     letter-spacing: 0.04em;
-    align-self: flex-start;
+    line-height: 1.05;
   }
 
-  .peer-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex-shrink: 0;
-  }
-
-  .top-bar-left {
+  .peers {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 0.875rem;
+    font-weight: 700;
   }
 
   .content {
-    flex: 1 1 0;
+    flex: 1;
     min-height: 0;
     overflow-y: auto;
+    padding: 0 var(--pad-x) 4px;
     -webkit-overflow-scrolling: touch;
   }
 
-  .btn-leave {
-    align-self: center;
-    background: transparent;
-    color: var(--danger);
-    border: 1px solid rgba(244, 67, 54, 0.2);
-    border-radius: var(--radius);
-    padding: 0.45rem 1.25rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    opacity: 0.75;
-    transition: opacity 0.15s, border-color 0.15s;
+  /*
+   * Landscape: the room code becomes a tall sign on the left, readable from
+   * a few metres away, with the program keys beside it. Solo and the
+   * program editor have no sign, so the content gets a wider centred column.
+   */
+  @media (orientation: landscape) and (min-width: 640px) {
+    .lobby-view { max-width: 1180px; }
+
+    .lobby-view:has(> .room) {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas: 'bar bar' 'room content';
+    }
+
+    .top-bar { grid-area: bar; }
+
+    .room {
+      grid-area: room;
+      margin: 6px 0 0 var(--pad-x);
+      padding: 26px 26px 24px;
+      gap: 6px;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .label { font-size: 0.875rem; }
+
+    /* Sized so four of the widest letters (WWWW, about 4.1em with the
+       tracking) still fit the panel, up to a sign-sized cap */
+    .code {
+      font-size: min(23cqw, 10rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+
+    .peers { font-size: 1.125rem; gap: 10px; margin-top: 10px; }
+    .peers .led { width: 10px; height: 10px; }
+
+    .content {
+      grid-area: content;
+      padding: 6px var(--pad-x) 4px 12px;
+    }
+
+    .lobby-view:not(:has(> .room)) { max-width: 980px; }
+    .lobby-view:not(:has(> .room)) .content { padding: 6px var(--pad-x) 4px; }
   }
 
-  .btn-leave:hover {
-    opacity: 1;
-    border-color: rgba(244, 67, 54, 0.5);
+  @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
+    .room { padding: 16px 20px; justify-content: flex-start; }
+    .code { font-size: min(23cqw, 6rem); }
+    .peers { font-size: 0.9375rem; margin-top: 4px; }
   }
 </style>

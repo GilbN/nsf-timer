@@ -1,255 +1,145 @@
 <script>
-  import { timerState, formattedTime, preferences } from '../lib/stores.js'
-  import { t } from '../lib/i18n.js'
+  import { timerState, preferences } from '../lib/stores.js'
+  import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
+  import { signalFor } from '../lib/signal.js'
+  import { contextFor, seriesLabel, seriesProgress, clockText, exerciseFacts } from '../lib/timer/progress.js'
+  import Display from './ui/Display.svelte'
+  import Meter from './ui/Meter.svelte'
 
-  let phase = $derived($timerState.phase)
-  let isTargetUp = $derived($timerState.targetVisible && phase === 'shooting')
-  let isTargetDown = $derived(!$timerState.targetVisible && phase === 'shooting')
-  let program = $derived(getProgramById($timerState.programId))
-  let isTrialStage = $derived(program?.stages[$timerState.stageIndex]?.isTrialStage ?? false)
+  /**
+   * isHost picks the idle wording: hosts start, shooters wait.
+   * live is false while a shooter's connection is down: the last state
+   * received may be stale, so the lamp goes off and the display stays dark
+   * instead of showing Ild that may no longer be true.
+   */
+  let { isHost = false, live = true } = $props()
+
+  let ts = $derived($timerState)
+  let phase = $derived(ts.phase)
+  let lang = $derived($preferences.lang)
+  let program = $derived(getProgramById(ts.programId))
+  let ctx = $derived(contextFor(program, ts))
+  let signal = $derived(live ? signalFor(ts) : { lamp: 'off', lit: false })
+  let progress = $derived(seriesProgress(ctx.exercise, ts))
+
+  let stateWord = $derived.by(() => {
+    if (!live) return $t('lastReceived')
+    if (phase === 'idle') return isHost ? $t('readyToStart') : $t('waitingForHost')
+    if (phase === 'shooting') return ts.targetVisible ? $t('targetUp') : $t('targetDown')
+    if (phase === 'stopped' && ts.stoppedReason === 'programComplete') return $t('programComplete')
+    return $t(phase)
+  })
+
+  let showing = $derived.by(() => {
+    const ex = ctx.exercise
+    if (ctx.stage?.type !== 'duell' || !ex?.targetVisibleTime || phase !== 'shooting') return null
+    const total = Math.ceil(ex.shotsPerSeries / (ex.shotsPerShowing || 1))
+    return `${$t('showing')} ${ts.duelShowingIndex + 1}/${total}`
+  })
+
+  let digits = $derived(clockText(ts, ctx.exercise, $preferences.countdownFormat))
+
+  // "Øvelse 2/3, Serie 2/4" in stages with several exercises
+  let position = $derived.by(() => {
+    const series = seriesLabel(ctx.exercise, ts, $t)
+    const count = ctx.stage?.exercises.length ?? 0
+    return count > 1 ? `${$t('exercise')} ${ts.exerciseIndex + 1}/${count}, ${series}` : series
+  })
+
+  // Loading, hidden/visible or time per series, and shots, so everyone can
+  // tell which exercise is next before the targets turn
+  let facts = $derived(exerciseFacts(ctx.stage, ctx.exercise, $t))
+
+  // How bright the digits are when the display is dark
+  let tone = $derived(
+    !live ? 'rest' : phase === 'loading' || phase === 'shooting' ? 'live' : phase === 'paused' ? 'paused' : 'rest'
+  )
 </script>
 
-<div
-  class="timer-display"
-  class:phase-loading={phase === 'loading'}
-  class:phase-shooting={phase === 'shooting'}
-  class:phase-paused={phase === 'paused'}
-  class:phase-stopped={phase === 'stopped'}
-  class:target-up={isTargetUp}
-  class:target-down={isTargetDown}
-  class:trial={isTrialStage}
->
-  <!-- Trial indicator -->
-  {#if isTrialStage}
-    <div class="trial-indicator">
-      <svg class="trial-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-        <line x1="4" y1="22" x2="4" y2="15"/>
-      </svg>
-      {$t('trial')}
-    </div>
-  {/if}
-
-  <!-- Phase banner strip -->
-  {#if phase !== 'idle'}
-    <div class="phase-banner">
-      <span class="phase-rule"></span>
-      <span class="phase-text">{$t(phase)}</span>
-      <span class="phase-rule"></span>
-    </div>
-  {/if}
-
-  <!-- Target indicator -->
-  {#if phase === 'shooting'}
-    <div class="target-indicator" class:up={isTargetUp}>
-      {#if isTargetUp}
-        <svg class="target-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <circle cx="12" cy="12" r="6"/>
-          <circle cx="12" cy="12" r="2"/>
-        </svg>
-        {$t('targetUp')}
-      {:else}
-        <svg class="target-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/>
-        </svg>
-        {$t('targetDown')}
-      {/if}
-    </div>
-  {/if}
-
-  <!-- Main time digits -->
-  <div class="time" class:glow={isTargetUp}>
-    {#if $preferences.countdownFormat === 'seconds'}
-      <span class="digits super">{$formattedTime.totalSeconds}</span>
-    {:else}
-      <span class="digits">{$formattedTime.minutes}</span>
-      <span class="colon">:</span>
-      <span class="digits">{$formattedTime.seconds}</span>
-    {/if}
+<Display lamp={signal.lamp} lit={signal.lit} class="timer-display">
+  <div class="line">
+    <span class="stage">{ctx.stage ? getLocalizedName(ctx.stage.name, lang) : ''}</span>
+    <span class="sub tnum">{position}</span>
   </div>
-</div>
+  <div class="line">
+    <span class="chips">
+      <span class="chip">{stateWord}</span>
+      {#if ctx.stage?.isTrialStage}<span class="chip ghost">{$t('trial')}</span>{/if}
+    </span>
+    <span class="sub ellipsis">{program ? getLocalizedName(program.name, lang) : ''}</span>
+  </div>
+
+  <div class="time" data-tone={tone}>
+    <span class="digits" style="--chars: {digits.length}" aria-live="off">{digits}</span>
+  </div>
+
+  {#if showing || facts.length}
+    <div class="line facts">
+      <!-- Each fact stays whole; the line wraps between them at big text sizes -->
+      <span class="sub tnum fact-list">{#each facts as fact, i (i)}<span class="fact">{fact}{i < facts.length - 1 ? ',' : ''}</span>{/each}</span>
+      {#if showing}<span class="sub tnum">{showing}</span>{/if}
+    </div>
+  {/if}
+  {#if progress.count > 1}
+    <Meter count={progress.count} done={progress.done} current={progress.current} />
+  {/if}
+</Display>
 
 <style>
-  .timer-display {
+  :global(.timer-display) { flex: 1; min-height: 0; }
+
+  .line {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    flex: 1;
-    width: 100%;
-    transition: background 0.4s ease;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    position: relative;
-  }
-
-  /* Phase background tints */
-  .phase-loading  { background: var(--phase-loading-bg); }
-  .phase-shooting { background: var(--phase-shooting-bg); }
-  .phase-paused   { background: var(--phase-paused-bg); }
-  .phase-stopped  { background: var(--phase-stopped-bg); }
-  .target-up      { background: rgba(0, 230, 118, 0.07); }
-  .target-down    { background: rgba(244, 67, 54, 0.07); }
-
-  /* ── Phase banner ── */
-  .phase-banner {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    width: 100%;
-    padding: 0 1.5rem;
-  }
-
-  .phase-rule {
-    flex: 1;
-    height: 1px;
-    opacity: 0.4;
-  }
-
-  .phase-text {
-    font-size: 0.65rem;
+    gap: 12px;
+    font-size: 0.875rem;
     font-weight: 700;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
+    min-width: 0;
+    flex: none;
   }
 
-  /* Phase banner colors */
-  .phase-loading  .phase-rule { background: var(--phase-loading); }
-  .phase-loading  .phase-text { color: var(--phase-loading); }
-  .phase-shooting .phase-rule { background: var(--phase-shooting); }
-  .phase-shooting .phase-text { color: var(--phase-shooting); }
-  .phase-paused   .phase-rule { background: var(--phase-paused); }
-  .phase-paused   .phase-text { color: var(--phase-paused); }
-  .phase-stopped  .phase-rule { background: var(--phase-stopped); }
-  .phase-stopped  .phase-text { color: var(--phase-stopped); }
+  .stage { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { color: var(--sub); font-weight: 600; white-space: nowrap; }
+  .ellipsis { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .facts { font-size: 0.8125rem; align-items: flex-start; }
+  .fact-list { display: flex; flex-wrap: wrap; column-gap: 0.3em; white-space: normal; min-width: 0; }
+  .fact { white-space: nowrap; }
+  .chips { display: flex; gap: 6px; flex: none; }
 
-  /* ── Target indicator ── */
-  .target-indicator {
-    display: flex;
+  .chip {
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    padding: 0.4rem 1.2rem;
-    border-radius: 100px;
-    background: rgba(244, 67, 54, 0.12);
-    color: var(--target-down);
-    border: 1px solid rgba(244, 67, 54, 0.25);
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: var(--chip-bg);
+    color: var(--chip-fg);
+    font-size: 0.8125rem;
+    font-weight: 800;
   }
 
-  .target-indicator.up {
-    background: rgba(0, 230, 118, 0.12);
-    color: var(--target-up);
-    border-color: rgba(0, 230, 118, 0.3);
-  }
+  .chip.ghost { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; color: var(--sub); }
 
-  .target-icon {
-    width: 1.1em;
-    height: 1.1em;
-    flex-shrink: 0;
-  }
-
-  /* ── Time digits ── */
+  /* The digits fill whatever room the display has, but always keep this
+     much height; the display grows around them */
   .time {
+    flex: 1;
+    min-height: clamp(96px, 20dvh, 220px);
+    container-type: size;
     display: flex;
-    align-items: baseline;
+    align-items: flex-end;
     justify-content: center;
-    gap: 0.02em;
-    transition: color 0.4s ease;
   }
 
   .digits {
-    font-family: var(--font-mono);
-    font-size: clamp(5rem, 24vw, 10rem);
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-    transition: color 0.4s ease, text-shadow 0.4s ease;
-    color: var(--text-primary);
+    font-size: min(calc(100cqw / (var(--chars) * 0.6)), 92cqh);
+    white-space: nowrap;
   }
 
-  .digits.super {
-    font-size: clamp(7rem, 34vw, 15rem);
-  }
-
-  .colon {
-    font-family: var(--font-mono);
-    font-size: clamp(4rem, 20vw, 8.5rem);
-    font-weight: 900;
-    line-height: 1;
-    color: var(--text-secondary);
-    align-self: baseline;
-    margin-bottom: 0.03em;
-    transition: color 0.4s ease;
-  }
-
-  /* ── Digit colors by phase ── */
-  .phase-loading .digits,
-  .phase-loading .colon  { color: var(--phase-loading); }
-
-  .phase-shooting .digits { color: var(--phase-shooting); }
-  .phase-shooting .colon  { color: var(--phase-shooting); opacity: 0.5; }
-
-  .target-down .digits { color: var(--target-down); }
-  .target-down .colon  { color: var(--target-down); opacity: 0.5; }
-
-  .phase-paused .digits   { color: var(--phase-paused); }
-  .phase-paused .colon    { color: var(--phase-paused); opacity: 0.4; }
-
-  .phase-stopped .digits  { color: var(--phase-stopped); }
-  .phase-stopped .colon   { color: var(--phase-stopped); }
-
-  /* Duel target-up glow */
-  .time.glow .digits {
-    color: var(--accent);
-    animation: glow-green 2s ease-in-out infinite;
-  }
-
-  /* ── Landscape: height is the constraint on mobile ── */
-  @media (orientation: landscape) and (max-height: 500px) {
-    .digits        { font-size: clamp(3rem, 18vh, 10rem); }
-    .digits.super  { font-size: clamp(4rem, 26vh, 15rem); }
-    .colon         { font-size: clamp(2.5rem, 14vh, 8.5rem); }
-    .timer-display { gap: 0.35rem; }
-    .phase-banner  { padding: 0 0.75rem; }
-  }
-
-  /* ── Trial indicator ── */
-  .trial-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    padding: 0.4rem 1.2rem;
-    border-radius: 100px;
-    background: rgba(255, 181, 71, 0.12);
-    color: var(--warning);
-    border: 1px solid rgba(255, 181, 71, 0.25);
-  }
-
-  .trial-icon {
-    width: 1.1em;
-    height: 1.1em;
-    flex-shrink: 0;
-  }
-
-  /* ── Trial stage: phase banner amber ── */
-  .trial.phase-loading .phase-rule,
-  .trial.phase-shooting .phase-rule,
-  .trial.phase-stopped .phase-rule,
-  .trial.phase-paused .phase-rule  { background: var(--warning); }
-
-  .trial.phase-loading .phase-text,
-  .trial.phase-shooting .phase-text,
-  .trial.phase-stopped .phase-text,
-  .trial.phase-paused .phase-text  { color: var(--warning); }
+  .time[data-tone='live'] .digits { color: var(--live); }
+  .time[data-tone='paused'] .digits { color: var(--soft); }
+  .time[data-tone='rest'] .digits { color: var(--muted); }
+  :global(.display.lit) .time .digits { color: var(--ink); }
 </style>

@@ -4,7 +4,7 @@
    * The browser handles focus trapping, Escape, the inert background and
    * returning focus on close. Clicking the backdrop closes it too.
    */
-  let { onClose, labelledby = undefined, children } = $props()
+  let { onClose, labelledby = undefined, variant = 'dialog', children } = $props()
 
   /** @type {HTMLDialogElement | undefined} */
   let dialog = $state()
@@ -57,7 +57,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby={labelledby} onclose={() => { if (!unmounted) onClose?.() }} onpointerdown={onPointerDown} onpointerup={onPointerUp} onclick={onBackdropClick}>
+<dialog bind:this={dialog} class:sheet={variant === 'sheet'} aria-labelledby={labelledby} onclose={() => { if (!unmounted) onClose?.() }} onpointerdown={onPointerDown} onpointerup={onPointerUp} onclick={onBackdropClick}>
   {@render children()}
 </dialog>
 
@@ -75,6 +75,21 @@
   }
 
   dialog::backdrop {
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.66);
   }
+
+  /* Bottom sheet: pinned to the bottom edge, within thumb reach */
+  dialog.sheet {
+    margin: auto auto 0;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    dialog.sheet[open] { animation: sheet-in 0.18s ease-out; }
+    dialog:not(.sheet)[open] { animation: dialog-in 0.14s ease-out; }
+  }
+
+  @keyframes sheet-in { from { transform: translateY(24px); opacity: 0.6; } }
+  @keyframes dialog-in { from { transform: scale(0.97); opacity: 0; } }
 </style>

@@ -67,6 +67,10 @@ Modals use `src/components/Modal.svelte`, a native `<dialog>` that handles focus
 | `src/lib/i18n.js` | Norwegian/English translations as a derived Svelte store (`t`) |
 | `src/lib/audio.js` | Web Audio API tones + vibration: `beepStart`, `beepStop`, `beepTargetUp`, `beepTargetDown`, `unlockAudio` |
 | `src/lib/wakeLock.js` | Screen wake lock wrapper (keeps display on during competition) |
+| `src/lib/signal.js` | `signalFor(timerState)`: range lamp colour (off/red/green) and whether the display turns white |
+| `src/lib/timer/progress.js` | Pure helpers for the next step (`forwardOptions`, `upNextText`), series progress and clock text |
+| `src/components/ui/` | Shared pieces of the Keys design: `Display` (lamp + lit state), `Meter`, `Icon` |
+| `src/styles/global.css` | Design tokens and the shared `.key`, `.btn`, `.pill`, `.led`, `.well`, `.tile`, `.sheet-panel` classes |
 
 ### Program structure
 

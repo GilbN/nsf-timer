@@ -133,6 +133,22 @@ describe('SocketClient — receiving RELAY messages', () => {
     await host.ws.close()
   })
 
+  it('calls onSnapshot for STATE_SYNC but not for TICK', async () => {
+    const host = await createHost(server.url)
+    const client = new SocketClient()
+    let snapshots = 0
+    client.onSnapshot(() => { snapshots++ })
+    await client.joinRoom(host.code, { name: 'A', lane: '1' })
+
+    host.ws.send({ action: 'RELAY', message: { type: MSG.TICK, payload: { remainingMs: 500 }, ts: 1 } })
+    host.ws.send({ action: 'RELAY', message: { type: MSG.STATE_SYNC, payload: { phase: 'shooting', remainingMs: 400 }, ts: 2 } })
+    await vi.waitFor(() => expect(get(timerState).remainingMs).toBe(400))
+    expect(snapshots).toBe(1)
+
+    client.destroy()
+    await host.ws.close()
+  })
+
   it('applies TICK messages as partial updates (remainingMs + targetVisible)', async () => {
     const host = await createHost(server.url)
     const client = new SocketClient()
@@ -191,9 +207,13 @@ describe('SocketClient — receiving RELAY messages', () => {
     await new Promise(r => setTimeout(r, 50))
 
     const client = new SocketClient()
+    let snapshots = 0
+    client.onSnapshot(() => { snapshots++ })
     await client.joinRoom(host.code, { name: 'Late', lane: '1' })
 
     await vi.waitFor(() => expect(get(timerState)).toMatchObject(state))
+    // The cached copy counts as a snapshot: a rejoining view can trust it
+    expect(snapshots).toBe(1)
 
     client.destroy()
     await host.ws.close()
