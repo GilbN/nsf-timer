@@ -8,7 +8,7 @@
   import { session, stopScheduler, rememberRoom, endSession } from '../lib/session.js'
   import { setSoundEnabled, beepStart, beepStop, beepTargetUp, beepTargetDown } from '../lib/audio.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
-  import { onNextUpdate } from '../lib/signal.js'
+  import { mayBeStaleSignal } from '../lib/signal.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
   import ControlBar from '../components/ControlBar.svelte'
   import PeerList from '../components/PeerList.svelte'
@@ -28,9 +28,6 @@
   let hasNextStage = $derived(program && $timerState.stageIndex < program.stages.length - 1)
   let connectionStatus = $state('connected')
   let awaitingFresh = $state(false)
-  /** @type {(() => void) | undefined} */
-  let stopWaiting
-  $effect(() => () => stopWaiting?.())
 
   // Persist timer state on changes (host only)
   $effect(() => {
@@ -71,15 +68,14 @@
   $effect(() => {
     const client = session.client
     if (client) {
+      // A full snapshot means the state on screen is current again
+      client.onSnapshot(() => { awaitingFresh = false })
       client.onStatusChange((status) => {
         if (status === 'connected') {
-          // Back after a drop: what's on screen is from before it, so keep
-          // the signal dark until the host's fresh state arrives
-          if (connectionStatus !== 'connected') {
-            awaitingFresh = true
-            stopWaiting?.()
-            stopWaiting = onNextUpdate(timerState, () => { awaitingFresh = false })
-          }
+          // Back after a drop, or the host reclaimed the room: a series in
+          // progress on screen may be stale, so keep the signal dark until
+          // the next snapshot. The lobby and a resting program can't light up.
+          if (mayBeStaleSignal(get(timerState))) awaitingFresh = true
           connectionStatus = 'connected'
         } else if (status === 'reconnecting') {
           connectionStatus = 'reconnecting'

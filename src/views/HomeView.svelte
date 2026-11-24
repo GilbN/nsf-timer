@@ -214,6 +214,11 @@
 </script>
 
 <div class="view home-view">
+  <!-- Live regions stay mounted so screen readers hear each change; the
+       visible status lines below are for sighted users only -->
+  <div class="sr-only" role="status">{connecting ? `${$t('connecting')}…` : ''}</div>
+  <div class="sr-only" role="alert">{!connecting && error ? error : ''}</div>
+
   {#if mode === 'home'}
     <div class="top-bar">
       <div class="cluster">
@@ -264,11 +269,10 @@
     <!-- Layout only: a column of its own in landscape, invisible in portrait -->
     <div class="keys-col">
       {#if connecting || error}
-        <!-- Separate elements: screen readers ignore a role change on a live node -->
         {#if connecting}
-          <div class="status" role="status"><span class="spinner"></span>{$t('connecting')}…</div>
+          <div class="status" aria-hidden="true"><span class="spinner"></span>{$t('connecting')}…</div>
         {:else}
-          <div class="status" role="alert"><span class="led red"></span><span class="err">{error}</span></div>
+          <div class="status" aria-hidden="true"><span class="led red"></span><span class="err">{error}</span></div>
         {/if}
       {/if}
 
@@ -381,9 +385,9 @@
       {/if}
 
       {#if connecting}
-        <p class="form-status" role="status"><span class="spinner"></span>{$t('connecting')}…</p>
+        <p class="form-status" aria-hidden="true"><span class="spinner"></span>{$t('connecting')}…</p>
       {:else if error}
-        <p class="form-status" role="alert"><span class="led red"></span>{error}</p>
+        <p class="form-status" aria-hidden="true"><span class="led red"></span>{error}</p>
       {/if}
 
       <!-- Lets Enter/Go submit; not display:none, which some browsers skip -->

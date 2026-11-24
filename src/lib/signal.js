@@ -17,27 +17,13 @@ export function signalFor(state) {
   return { lamp: 'red', lit: false }
 }
 
+
 /**
- * Call `onUpdate` once, the next time `store` changes, and stop listening.
- * Used after a reconnect: the state on screen is from before the drop, so
- * the signal stays dark until the host's fresh state arrives.
- * @param {{ subscribe: (fn: (value: any) => void) => () => void }} store
- * @param {() => void} onUpdate
- * @returns {() => void} stops waiting
+ * Whether a state left on screen across a connection drop could show a
+ * live signal that is no longer true. Only a series in progress can:
+ * the lobby and an idle or stopped program never light the display.
+ * @param {{ programId?: string | null, phase: string }} state
  */
-export function onNextUpdate(store, onUpdate) {
-  let initial = true
-  let done = false
-  /** @type {(() => void) | undefined} */
-  let unsubscribe
-  unsubscribe = store.subscribe(() => {
-    // subscribe() calls back once at once with the current value; skip that
-    if (initial) return
-    if (done) return
-    done = true
-    onUpdate()
-    unsubscribe?.()
-  })
-  initial = false
-  return () => { done = true; unsubscribe?.() }
+export function mayBeStaleSignal(state) {
+  return !!state.programId && (state.phase === 'loading' || state.phase === 'shooting' || state.phase === 'paused')
 }

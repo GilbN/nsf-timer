@@ -100,12 +100,15 @@
     flex-direction: column;
     gap: 2px;
     flex: none;
+    container-type: inline-size;
+    overflow: hidden;
   }
 
   .label { font-size: 0.75rem; font-weight: 700; }
 
+  /* Capped so WWWW still fits a 320px phone at the largest text size */
   .code {
-    font-size: 3.25rem;
+    font-size: min(22cqw, 3.25rem);
     font-weight: 800;
     letter-spacing: 0.04em;
     line-height: 1.05;

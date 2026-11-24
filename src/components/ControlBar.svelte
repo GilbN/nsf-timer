@@ -157,7 +157,6 @@
     gap: 10px;
   }
 
-
   /* Labels wrap to a second line rather than being cut off; the count never shrinks */
   .row .key { min-width: 0; min-height: 60px; padding: 12px 16px; line-height: 1.15; }
   .row .label { min-width: 0; overflow-wrap: break-word; }

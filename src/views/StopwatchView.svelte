@@ -210,9 +210,10 @@
 <style>
   .title { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
 
+  /* Like the timer: never shrink below the content, scroll instead */
   :global(.sw-display) {
     flex: 1;
-    min-height: 0;
+    min-height: min-content;
     margin: 6px var(--pad-x) 0;
   }
 
@@ -244,10 +245,10 @@
   .tap { display: inline-flex; align-items: center; gap: 6px; }
   .tap :global(svg) { width: 14px; height: 14px; }
 
-  /* The digits fill whatever room the display has */
+  /* The digits fill whatever room the display has, never less than this */
   .time {
     flex: 1;
-    min-height: 0;
+    min-height: clamp(96px, 20dvh, 220px);
     width: 100%;
     container-type: size;
     display: flex;
@@ -270,7 +271,7 @@
 
   .editor {
     flex: 1;
-    min-height: 0;
+    min-height: min-content;
     display: flex;
     align-items: center;
     justify-content: center;

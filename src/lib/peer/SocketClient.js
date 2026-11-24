@@ -15,6 +15,7 @@ export class SocketClient {
     this.lane = ''
     this.role = 'client'
     this._onStatusChange = null
+    this._onSnapshot = null
     this._destroyed = false
     this._roomClosed = false
     this._reconnectAttempt = 0
@@ -23,6 +24,13 @@ export class SocketClient {
   }
 
   onStatusChange(cb) { this._onStatusChange = cb }
+
+  /**
+   * Called after each full timer snapshot (STATE_SYNC, live from the host
+   * or the relay's cached copy), never after a TICK or phase delta. Views
+   * use it to know the state on screen is current again after a drop.
+   */
+  onSnapshot(cb) { this._onSnapshot = cb }
 
   async joinRoom(code, { name = '', lane = '', role = 'client' } = {}) {
     this.code = code.toUpperCase()
@@ -156,6 +164,7 @@ export class SocketClient {
     switch (msg.type) {
       case MSG.STATE_SYNC:
         timerState.set(msg.payload)
+        this._onSnapshot?.()
         break
       case MSG.TICK:
         timerState.update((s) => ({

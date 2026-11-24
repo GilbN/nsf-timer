@@ -122,8 +122,8 @@
 
   .chip.ghost { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; color: var(--sub); }
 
-  /* The digits fill whatever room the display has, in any layout */
-  /* The digits always keep this much height; the display grows around it */
+  /* The digits fill whatever room the display has, but always keep this
+     much height; the display grows around them */
   .time {
     flex: 1;
     min-height: clamp(96px, 20dvh, 220px);
@@ -138,7 +138,7 @@
     white-space: nowrap;
   }
 
-  .time[data-tone='live'] .digits { color: #e4e4e7; }
+  .time[data-tone='live'] .digits { color: var(--live); }
   .time[data-tone='paused'] .digits { color: var(--soft); }
   .time[data-tone='rest'] .digits { color: var(--muted); }
   :global(.display.lit) .time .digits { color: var(--ink); }

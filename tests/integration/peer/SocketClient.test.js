@@ -133,6 +133,22 @@ describe('SocketClient — receiving RELAY messages', () => {
     await host.ws.close()
   })
 
+  it('calls onSnapshot for STATE_SYNC but not for TICK', async () => {
+    const host = await createHost(server.url)
+    const client = new SocketClient()
+    let snapshots = 0
+    client.onSnapshot(() => { snapshots++ })
+    await client.joinRoom(host.code, { name: 'A', lane: '1' })
+
+    host.ws.send({ action: 'RELAY', message: { type: MSG.TICK, payload: { remainingMs: 500 }, ts: 1 } })
+    host.ws.send({ action: 'RELAY', message: { type: MSG.STATE_SYNC, payload: { phase: 'shooting', remainingMs: 400 }, ts: 2 } })
+    await vi.waitFor(() => expect(get(timerState).remainingMs).toBe(400))
+    expect(snapshots).toBe(1)
+
+    client.destroy()
+    await host.ws.close()
+  })
+
   it('applies TICK messages as partial updates (remainingMs + targetVisible)', async () => {
     const host = await createHost(server.url)
     const client = new SocketClient()

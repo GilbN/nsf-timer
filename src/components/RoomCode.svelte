@@ -51,7 +51,7 @@
   .code { font-size: 0.9375rem; font-weight: 800; letter-spacing: 0.04em; }
   .code :global(svg) { color: var(--muted); }
   .copied { font-size: 0.75rem; font-weight: 700; color: var(--muted); letter-spacing: 0; }
-  .share { width: 30px; padding: 0; justify-content: center; }
+  .share { width: 30px; flex: none; padding: 0; justify-content: center; }
 
   /* The pills stay 30px tall but take taps across a 44px area */
   .code, .share { position: relative; }

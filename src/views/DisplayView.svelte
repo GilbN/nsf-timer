@@ -1,4 +1,5 @@
 <script>
+  import { get } from 'svelte/store'
   import { roomState, timerState, preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
@@ -8,7 +9,7 @@
   import Display from '../components/ui/Display.svelte'
   import Meter from '../components/ui/Meter.svelte'
   import Icon from '../components/ui/Icon.svelte'
-  import { signalFor, onNextUpdate } from '../lib/signal.js'
+  import { signalFor, mayBeStaleSignal } from '../lib/signal.js'
   import { seriesLabel, seriesProgress, exerciseFacts, clockText } from '../lib/timer/progress.js'
 
   let connectionStatus = $state('connected')
@@ -30,9 +31,6 @@
   // While the connection is down the last state may be stale: lamp off and
   // a dark display rather than an Ild that may no longer be true
   let awaitingFresh = $state(false)
-  /** @type {(() => void) | undefined} */
-  let stopWaiting
-  $effect(() => () => stopWaiting?.())
   let live = $derived(connectionStatus === 'connected' && !awaitingFresh)
   let signal = $derived(live ? signalFor($timerState) : { lamp: 'off', lit: false })
   let progress = $derived(seriesProgress(exercise, $timerState))
@@ -62,13 +60,12 @@
   $effect(() => {
     const client = session.client
     if (client) {
+      // A full snapshot means the state on screen is current again
+      client.onSnapshot(() => { awaitingFresh = false })
       client.onStatusChange((status) => {
-        if (status === 'connected' && connectionStatus !== 'connected') {
-          // Back after a drop: stay dark until the host's fresh state arrives
-          awaitingFresh = true
-          stopWaiting?.()
-          stopWaiting = onNextUpdate(timerState, () => { awaitingFresh = false })
-        }
+        // Back after a drop, or the host reclaimed the room: a series in
+        // progress may be stale, so stay dark until the next snapshot
+        if (status === 'connected' && mayBeStaleSignal(get(timerState))) awaitingFresh = true
         if (status === 'connected') connectionStatus = 'connected'
         else if (status === 'reconnecting') connectionStatus = 'reconnecting'
         else if (status === 'roomClosed') connectionStatus = 'roomClosed'
@@ -231,7 +228,7 @@
     white-space: nowrap;
   }
 
-  .time[data-tone='live'] .digits { color: #e4e4e7; }
+  .time[data-tone='live'] .digits { color: var(--live); }
   .time[data-tone='paused'] .digits { color: var(--soft); }
   .time[data-tone='rest'] .digits { color: var(--muted); }
   :global(.display.lit) .time .digits { color: var(--ink); }

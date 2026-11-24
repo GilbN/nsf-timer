@@ -27,6 +27,7 @@
   --key-hi: rgba(255, 255, 255, 0.07);
   --muted: #8e8e93;
   --faint: #48484a;       /* decoration only; too dark for text */
+  --live: #e4e4e7;        /* running digits on the dark display */
   --soft: #b4b4b9;        /* paused digits: between live and resting */
   --stroke: #6e6e73;      /* outlines that must read as shapes (3:1) */
   --stroke-faint: #3a3a3d;
