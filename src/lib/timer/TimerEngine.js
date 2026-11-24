@@ -5,7 +5,9 @@
  * Browsers pause requestAnimationFrame in background tabs, so every tick also
  * arms a backup setTimeout for the next whole-second boundary (or the end of
  * the countdown). That keeps phase changes and second updates firing while
- * the host's tab is hidden.
+ * the host's tab is hidden. Chrome still throttles chained timers in tabs
+ * hidden for more than 5 minutes to about once a minute, so a host should
+ * keep the timer tab in front.
  */
 export class TimerEngine {
   constructor() {

@@ -523,6 +523,32 @@ describe('TimerScheduler', () => {
   })
 
   describe('restoreState', () => {
+    it('broadcasts the restored state so clients leave the idle snapshot from loadProgram', () => {
+      vi.setSystemTime(new Date('2026-04-17T10:00:00Z'))
+      const received = []
+      scheduler.onStateChange((state) => received.push(state))
+      scheduler.loadProgram('standard')
+      scheduler.restoreState({
+        phase: 'loading',
+        programId: 'standard',
+        stageIndex: 1,
+        exerciseIndex: 0,
+        seriesIndex: 0,
+        phaseStartedAt: Date.parse('2026-04-17T09:59:50Z'),
+        totalMs: 60_000,
+        remainingMs: 60_000,
+        targetVisible: false,
+      })
+      expect(received.at(-1)).toMatchObject({ phase: 'loading', stageIndex: 1, remainingMs: 50_000 })
+    })
+
+    it('broadcasts a restored stopped state', () => {
+      const received = []
+      scheduler.onStateChange((state) => received.push(state))
+      scheduler.restoreState({ phase: 'stopped', programId: 'standard', stageIndex: 2, exerciseIndex: 0, seriesIndex: 1, remainingMs: 0, totalMs: 0, targetVisible: false })
+      expect(received.at(-1)).toMatchObject({ phase: 'stopped', stageIndex: 2 })
+    })
+
     it('restores a stopped state as-is', () => {
       const saved = {
         phase: 'stopped',

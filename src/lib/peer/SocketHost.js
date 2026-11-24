@@ -21,6 +21,8 @@ export class SocketHost {
     /** @type {string | null} */
     this.hostToken = null // secret from the relay that lets this host reclaim the room
     this._onPeersChange = null
+    this._onHostToken = null
+    this._onReplaced = null
     this._lastTimerState = null
     this._destroyed = false
     this._reconnectTimer = null
@@ -28,6 +30,22 @@ export class SocketHost {
 
   onPeersChange(cb) {
     this._onPeersChange = cb
+  }
+
+  /** Called with the token whenever the relay issues one (create or re-create). */
+  onHostToken(cb) {
+    this._onHostToken = cb
+  }
+
+  /** Called once if another socket reclaims this room with our token. */
+  onReplaced(cb) {
+    this._onReplaced = cb
+  }
+
+  _setHostToken(token) {
+    if (!token || token === this.hostToken) return
+    this.hostToken = token
+    if (this._onHostToken) this._onHostToken(token)
   }
 
   generateCode() {
@@ -74,7 +92,7 @@ export class SocketHost {
       if (resolve) {
         // Still in initial setup — wait for ROOM_CREATED or ERROR
         if (envelope.action === 'ROOM_CREATED') {
-          this.hostToken = envelope.hostToken ?? this.hostToken
+          this._setHostToken(envelope.hostToken)
           this._syncRoomState()
           this._attachMessageHandler()
           resolve(this.code)
@@ -133,6 +151,7 @@ export class SocketHost {
         // Another tab or device reclaimed the room with our token. Reconnecting
         // would just take it back, so stop here.
         this._destroyed = true
+        if (this._onReplaced) this._onReplaced()
         return
       }
       if (!this._destroyed) {
@@ -230,7 +249,7 @@ export class SocketHost {
         let envelope
         try { envelope = JSON.parse(event.data) } catch { return }
         if (envelope.action === 'ROOM_CREATED') {
-          this.hostToken = envelope.hostToken ?? this.hostToken
+          this._setHostToken(envelope.hostToken)
           this._attachMessageHandler()
           // Re-broadcast current state so any remaining clients get it
           const state = this._lastTimerState || get(timerState)
@@ -239,6 +258,8 @@ export class SocketHost {
           }
           resolve()
         } else if (envelope.action === 'ERROR') {
+          ws.onclose = null
+          ws.close()
           reject(new Error(envelope.reason))
         }
       }

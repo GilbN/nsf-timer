@@ -48,6 +48,7 @@ function detach(ws) {
   ws._roomCode = null
   ws._role = null
   ws._peerId = null
+  ws._isSpectator = false
 }
 
 function isLaneTaken(room, lane) {
@@ -61,7 +62,7 @@ function isLaneTaken(room, lane) {
 // --- Message handlers ---
 
 function handleCreateRoom(ws, { code, hostToken }) {
-  if (!code || code.length !== 4) {
+  if (typeof code !== 'string' || code.length !== 4) {
     send(ws, { action: 'ERROR', reason: 'invalid_code' })
     return
   }
@@ -177,6 +178,17 @@ function handleRelay(ws, { message }) {
     // Cache STATE_SYNC for reconnecting clients
     if (message?.type === 'STATE_SYNC') {
       room.lastState = message
+    } else if (message?.type === 'TICK' && room.lastState) {
+      // Keep the cached countdown current so late joiners see the right time
+      const tick = message.payload || {}
+      room.lastState = {
+        ...room.lastState,
+        payload: {
+          ...room.lastState.payload,
+          remainingMs: tick.remainingMs ?? room.lastState.payload?.remainingMs,
+          targetVisible: tick.targetVisible ?? room.lastState.payload?.targetVisible,
+        },
+      }
     }
     // Fan out to all clients
     for (const { ws: clientWs } of room.clients.values()) {
@@ -286,7 +298,7 @@ function startHeartbeat(wss) {
 
 // Returns false when the socket is over its message budget
 function takeToken(ws) {
-  const now = Date.now()
+  const now = performance.now()
   ws._tokens = Math.min(RATE_BURST, ws._tokens + (now - ws._lastRefill) * RATE_PER_SEC / 1000)
   ws._lastRefill = now
   if (ws._tokens < 1) return false
@@ -300,7 +312,7 @@ function setupConnectionHandler(wss) {
   wss.on('connection', (ws) => {
     ws._alive = true
     ws._tokens = RATE_BURST
-    ws._lastRefill = Date.now()
+    ws._lastRefill = performance.now()
 
     ws.on('pong', () => { ws._alive = true })
 
@@ -312,6 +324,8 @@ function setupConnectionHandler(wss) {
       } catch {
         return
       }
+      // Valid JSON like `null` or `42` must not crash the process
+      if (!msg || typeof msg !== 'object') return
 
       switch (msg.action) {
         case 'CREATE_ROOM':  handleCreateRoom(ws, msg);          break

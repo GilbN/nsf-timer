@@ -23,12 +23,6 @@
   let selectedExercise = $derived(selectedStage?.exercises[selectedExerciseIdx])
   let showExercisePicker = $derived((selectedStage?.exercises.length ?? 0) > 1)
 
-  $effect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  })
-
   function selectStage(i) {
     selectedStageIdx = i
     selectedExerciseIdx = 0

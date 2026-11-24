@@ -18,14 +18,23 @@
     }
   })
 
+  // The browser sends clicks on ::backdrop to the <dialog> itself. Only close
+  // when the press also started there, so a drag out of the panel doesn't.
+  let pressedOnBackdrop = false
+
+  /** @param {PointerEvent} e */
+  function onPointerDown(e) {
+    pressedOnBackdrop = e.target === dialog
+  }
+
   /** @param {MouseEvent} e */
   function onBackdropClick(e) {
-    // Clicks on ::backdrop are dispatched to the <dialog> itself.
-    if (e.target === dialog) dialog.close()
+    if (pressedOnBackdrop && e.target === dialog) dialog?.close()
+    pressedOnBackdrop = false
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby={labelledby} onclose={() => onClose?.()} onclick={onBackdropClick}>
+<dialog bind:this={dialog} aria-labelledby={labelledby} onclose={() => onClose?.()} onpointerdown={onPointerDown} onclick={onBackdropClick}>
   {@render children()}
 </dialog>
 

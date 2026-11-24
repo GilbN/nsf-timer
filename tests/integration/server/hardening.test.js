@@ -20,6 +20,20 @@ describe('relay server: http and limits', () => {
     await res.text()
   })
 
+  it('ignores JSON that is not an object and codes that are not strings', async () => {
+    const ws = await connect(server.url)
+    ws.raw.send('null')
+    ws.raw.send('42')
+    ws.send({ action: 'CREATE_ROOM', code: [1, 2, 3, 4] })
+    const err = await ws.waitFor('ERROR')
+    expect(err.reason).toBe('invalid_code')
+
+    // The server is still up and answering on the same socket
+    ws.send({ action: 'PING' })
+    await ws.waitFor('PONG')
+    await ws.close()
+  })
+
   it('drops messages over the rate limit without closing the socket', async () => {
     const ws = await connect(server.url)
     let pongs = 0

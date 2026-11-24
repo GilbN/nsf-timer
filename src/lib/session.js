@@ -3,7 +3,7 @@ import { SocketHost } from './peer/SocketHost.js'
 import { SocketClient } from './peer/SocketClient.js'
 import { TimerScheduler } from './timer/TimerScheduler.js'
 import { currentView, roomState } from './stores.js'
-import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState } from './storage.js'
+import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState, saveRoomState } from './storage.js'
 
 /**
  * The connection and scheduler this tab is running. Only one session is
@@ -21,6 +21,21 @@ export const session = { host: null, client: null, scheduler: null }
  */
 export async function hostRoom(code = null, hostToken = null) {
   const host = new SocketHost()
+  // A relay restart re-creates the room with a new token; keep the saved
+  // copy current so a later reload can still reclaim it.
+  host.onHostToken((token) => {
+    const saved = loadRoomState()
+    if (saved?.isHost && saved.code === host.code) saveRoomState({ ...saved, hostToken: token })
+  })
+  // Another tab or device took over this room. Stop the timer here and go
+  // home. The saved session now belongs to the new host, so leave it alone.
+  host.onReplaced(() => {
+    if (session.host !== host) return
+    stopScheduler()
+    session.host = null
+    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
+    currentView.set('home')
+  })
   try {
     await host.createRoom(code, hostToken)
   } catch (e) {
@@ -62,12 +77,10 @@ export function startScheduler(programId, savedTimer = null) {
     scheduler.onStateChange((state) => host.broadcastState(state))
     scheduler.onTick((tick) => host.broadcastTick(tick))
   }
-  if (savedTimer?.programId) {
-    scheduler.loadProgram(savedTimer.programId)
-    scheduler.restoreState(savedTimer)
-  } else {
-    scheduler.loadProgram(programId)
-  }
+  // Don't call loadProgram before restoring. It would broadcast an 'idle'
+  // snapshot, and every client would beep when the real state follows.
+  if (savedTimer?.programId) scheduler.restoreState(savedTimer)
+  if (!scheduler.program) scheduler.loadProgram(programId)
   session.scheduler = scheduler
   return scheduler
 }
@@ -91,7 +104,7 @@ export function rememberRoom(extra = {}) {
     isSpectator: room.isSpectator,
     name: saved.name,
     lane: saved.lane,
-    hostToken: saved.hostToken,
+    hostToken: session.host?.hostToken ?? saved.hostToken,
     ...extra,
   })
 }

@@ -107,8 +107,15 @@ export class TimerScheduler {
           ...savedState,
           remainingMs: remaining,
         }
-        timerState.set({ ...this.state })
-        this._resumeCountdown(remaining, savedState.phase)
+        // A duel can't resume mid-cycle, so it comes back paused.
+        const exercise = this.getCurrentExercise()
+        if (savedState.phase === 'shooting' && this.getCurrentStage()?.type === 'duell' && exercise?.targetVisibleTime) {
+          this.state.phase = 'paused'
+        }
+        // Send a full snapshot first. Countdown ticks alone can't change
+        // the phase clients last saw.
+        this._updateState({})
+        if (this.state.phase !== 'paused') this._resumeCountdown(remaining, savedState.phase)
         return
       }
     } else if (wasPaused) {
@@ -118,7 +125,7 @@ export class TimerScheduler {
       this.state = { ...savedState }
     }
 
-    timerState.set({ ...this.state })
+    this._updateState({})
   }
 
   /**
@@ -132,23 +139,12 @@ export class TimerScheduler {
         this._startShooting()
       })
     } else if (phase === 'shooting') {
-      const stage = this.getCurrentStage()
-      const exercise = this.getCurrentExercise()
-
-      if (stage?.type === 'duell' && exercise?.targetVisibleTime) {
-        // For duell, we can't easily resume mid-cycle, so pause it
-        this._updateState({
-          phase: 'paused',
-          remainingMs,
-        })
-      } else {
-        // Precision — resume the countdown
-        this.engine.startCountdown(remainingMs, (remaining) => {
-          this._tickState(remaining)
-        }, () => {
-          this._seriesComplete()
-        })
-      }
+      // Duels never get here. restoreState brings them back paused.
+      this.engine.startCountdown(remainingMs, (remaining) => {
+        this._tickState(remaining)
+      }, () => {
+        this._seriesComplete()
+      })
     }
   }
 

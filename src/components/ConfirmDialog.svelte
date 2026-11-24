@@ -3,28 +3,36 @@
   import { t } from '../lib/i18n.js'
   import Modal from './Modal.svelte'
 
-  /** @param {boolean} ok */
-  function answer(ok) {
-    const request = $confirmRequest
-    if (!request) return
+  /**
+   * @param {boolean} ok
+   * @param {any} request the request this answer is for
+   */
+  function answer(ok, request) {
+    // The dialog's close event fires a task after it unmounts. Ignore it
+    // if a newer request has replaced this one by then.
+    if (!request || $confirmRequest !== request) return
     confirmRequest.set(null)
     request.resolve(ok)
   }
 </script>
 
 {#if $confirmRequest}
-  <Modal onClose={() => answer(false)} labelledby="confirm-dialog-message">
-    <div class="modal-panel">
-      <p id="confirm-dialog-message" class="modal-body">{$confirmRequest.message}</p>
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick={() => answer(false)}>{$t('cancel')}</button>
-        <!-- svelte-ignore a11y_autofocus -->
-        <button class="btn-primary" autofocus onclick={() => answer(true)}>
-          {$confirmRequest.confirmLabel ?? 'OK'}
-        </button>
+  {@const request = $confirmRequest}
+  {#key request}
+    <Modal onClose={() => answer(false, request)} labelledby="confirm-dialog-message">
+      <div class="modal-panel">
+        <p id="confirm-dialog-message" class="modal-body">{request.message}</p>
+        <div class="modal-actions">
+          <!-- Every confirm guards a destructive action, so Enter means Cancel -->
+          <!-- svelte-ignore a11y_autofocus -->
+          <button class="btn-secondary" autofocus onclick={() => answer(false, request)}>{$t('cancel')}</button>
+          <button class="btn-primary" onclick={() => answer(true, request)}>
+            {request.confirmLabel ?? 'OK'}
+          </button>
+        </div>
       </div>
-    </div>
-  </Modal>
+    </Modal>
+  {/key}
 {/if}
 
 <style>

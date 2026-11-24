@@ -60,6 +60,8 @@ describe('SocketHost.createRoom', () => {
 
   it('stops reconnecting when another socket reclaims the room with its token', async () => {
     const host1 = new SocketHost()
+    const replaced = vi.fn()
+    host1.onReplaced(replaced)
     const code = await host1.createRoom()
 
     const host2 = new SocketHost()
@@ -69,7 +71,17 @@ describe('SocketHost.createRoom', () => {
 
     expect(host1._destroyed).toBe(true)
     expect(host1._reconnectTimer).toBeNull()
+    expect(replaced).toHaveBeenCalledTimes(1)
     host2.destroy()
+  })
+
+  it('reports the token the relay issues', async () => {
+    const host = new SocketHost()
+    const tokens = []
+    host.onHostToken((t) => tokens.push(t))
+    await host.createRoom()
+    expect(tokens).toEqual([host.hostToken])
+    host.destroy()
   })
 
   it('rejects a reclaim with the wrong token', async () => {
