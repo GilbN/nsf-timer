@@ -696,4 +696,106 @@ describe('TimerScheduler', () => {
       expect(get(timerState).remainingMs).toBe(scheduler.engine.remainingMs)
     })
   })
+
+  describe('reload and resume', () => {
+    // Simulate a page reload. A fresh scheduler restores the last saved state.
+    function reload() {
+      const saved = JSON.parse(JSON.stringify(scheduler.state))
+      scheduler.destroy()
+      scheduler = new TimerScheduler()
+      scheduler.restoreState(saved)
+    }
+
+    it('restores the right time after a pause and resume', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries() // 60s loading
+      vi.advanceTimersByTime(20_000)
+      scheduler.pause()
+      vi.advanceTimersByTime(30_000) // paused time must not count
+      scheduler.resume()
+      vi.advanceTimersByTime(10_000) // 30s of loading left
+      reload()
+
+      expect(scheduler.state.phase).toBe('loading')
+      expect(scheduler.state.remainingMs).toBeGreaterThan(29_000)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(30_000)
+    })
+
+    it('restores the right time in the visible part of a rapid series', () => {
+      scheduler.loadProgram('silhuett')
+      scheduler.jumpTo(1, 0, 0) // 7s hidden, 8s visible
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      vi.advanceTimersByTime(3_000)
+      reload()
+
+      expect(scheduler.state.targetVisible).toBe(true)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(5_000)
+      expect(scheduler.state.remainingMs).toBeGreaterThan(4_500)
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('stopped')
+    })
+
+    it('shows the target after a reload in the hidden part of a rapid series', () => {
+      scheduler.loadProgram('silhuett')
+      scheduler.jumpTo(1, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      vi.advanceTimersByTime(3_000) // 4s of hidden time left
+      reload()
+
+      expect(scheduler.state.targetVisible).toBe(false)
+      runPhase(4_000)
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+    })
+
+    it('counts down when resuming a series that was paused before a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      vi.advanceTimersByTime(50_000)
+      scheduler.pause() // 10s of loading left
+      reload()
+      expect(scheduler.state.phase).toBe('paused')
+
+      scheduler.resume()
+      expect(scheduler.state.phase).toBe('loading')
+      vi.advanceTimersByTime(5_000)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(5_000)
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
+
+    it('carries on a duel after a reload mid-cycle', () => {
+      scheduler.loadProgram('fingrov')
+      scheduler.jumpTo(3, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000) // first showing is up
+      reload()
+
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+      runPhase(3_290)
+      expect(scheduler.state.targetVisible).toBe(false)
+      expect(scheduler.state.duelShowingIndex).toBe(1)
+    })
+
+    it('resumes a duel that was paused before a reload', () => {
+      scheduler.loadProgram('fingrov')
+      scheduler.jumpTo(3, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      vi.advanceTimersByTime(2_000)
+      scheduler.pause() // 5s of the first hidden time left
+      reload()
+
+      scheduler.resume()
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+      expect(scheduler.state.duelShowingIndex).toBe(0)
+    })
+  })
 })

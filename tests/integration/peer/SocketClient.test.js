@@ -239,6 +239,32 @@ describe('SocketClient host presence', () => {
   })
 })
 
+describe('SocketClient after a relay restart', () => {
+  it('keeps retrying until the host has re-created the room', async () => {
+    const host = await createHost(server.url)
+    const client = new SocketClient()
+    const statuses = []
+    client.onStatusChange((s) => statuses.push(s))
+    await client.joinRoom(host.code, { name: 'A', lane: '1' })
+
+    // Restart the relay on the same port. All rooms are gone.
+    const { port } = server
+    await server.close()
+    server = await startServer({ port, hostGracePeriod: 500 })
+
+    // The client's first retry (after 1s) finds no room. The host comes
+    // back a moment later, the way SocketHost re-creates its room.
+    await new Promise((r) => setTimeout(r, 1500))
+    const back = await createHost(server.url, host.code)
+
+    await vi.waitFor(() => expect(statuses.at(-1)).toBe('connected'), { timeout: 8000 })
+    expect(client._destroyed).toBe(false)
+
+    client.destroy()
+    await back.ws.close()
+  }, 15_000)
+})
+
 describe('SocketClient destroy', () => {
   it('stops reconnect attempts and clears roomState', async () => {
     const host = await createHost(server.url)

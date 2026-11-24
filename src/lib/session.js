@@ -2,7 +2,7 @@ import { get } from 'svelte/store'
 import { SocketHost } from './peer/SocketHost.js'
 import { SocketClient } from './peer/SocketClient.js'
 import { TimerScheduler } from './timer/TimerScheduler.js'
-import { currentView, roomState } from './stores.js'
+import { currentView, roomState, timerState } from './stores.js'
 import { confirmRequest } from './confirm.js'
 import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState, saveRoomState } from './storage.js'
 
@@ -105,7 +105,10 @@ export function rememberRoom(extra = {}) {
   const room = get(roomState)
   if (!room.code || room.isSolo) return
   const saved = loadRoomState() || {}
+  const timer = get(timerState)
   addRoomToHistory({
+    // Lets a host who rejoins from the list continue where the program was
+    timer: room.isHost && timer.programId ? timer : undefined,
     code: room.code,
     isHost: room.isHost,
     isSpectator: room.isSpectator,

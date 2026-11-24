@@ -74,6 +74,15 @@ export class SocketClient {
           if (envelope.action === 'ERROR') {
             clearTimeout(timeout)
             const reason = envelope.reason === 'lane_taken' ? 'laneRejected' : envelope.reason
+            if (this._reconnectAttempt > 0) {
+              // Rejoining after a drop. After a relay restart the host may
+              // not have re-created the room yet, so let _autoReconnect try
+              // again instead of giving up.
+              ws.onclose = null
+              ws.close()
+              reject(new Error(reason))
+              return
+            }
             if (envelope.reason === 'lane_taken') {
               this._emitStatus('laneRejected')
             }
