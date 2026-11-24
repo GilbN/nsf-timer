@@ -81,7 +81,8 @@
         const host = await hostRoom(room.code, room.hostToken ?? null)
         saveRoomState({ code: room.code, isHost: true, hostToken: host.hostToken, programId: room.programId })
         if (room.programId) {
-          startScheduler(room.programId)
+          const savedTimer = room.timer?.programId === room.programId ? room.timer : null
+          startScheduler(room.programId, savedTimer)
         }
         currentView.set(room.programId ? 'timer' : 'lobby')
       } else if (room.isSpectator) {

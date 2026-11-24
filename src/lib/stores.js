@@ -21,10 +21,13 @@ import { writable, derived } from 'svelte/store'
  * @property {boolean} targetVisible
  * @property {number} duelShowingIndex
  * @property {number | null} phaseStartedAt
+ * @property {number | null} [phaseEndsAt] wall-clock time the running countdown ends
+ * @property {string | null} [pausedPhase] the phase a paused countdown returns to
  * @property {boolean} isReshoot
  * @property {string | null} reshootPeerName
  * @property {boolean} stageComplete
  * @property {string | null} [stoppedReason]
+ * @property {string | null} [preReshootStoppedReason] the result a reshoot returns to
  */
 
 // View routing

@@ -27,7 +27,7 @@
 
   // Persist timer state on changes (host only)
   $effect(() => {
-    if (isHost && $timerState.phase !== 'idle') {
+    if (isHost && $timerState.programId) {
       saveTimerState($timerState)
     }
   })

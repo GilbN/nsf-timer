@@ -1,8 +1,8 @@
 import { get } from 'svelte/store'
 import { SocketHost } from './peer/SocketHost.js'
 import { SocketClient } from './peer/SocketClient.js'
-import { TimerScheduler } from './timer/TimerScheduler.js'
-import { currentView, roomState } from './stores.js'
+import { TimerScheduler, interruptedReason } from './timer/TimerScheduler.js'
+import { currentView, roomState, timerState } from './stores.js'
 import { confirmRequest } from './confirm.js'
 import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState, saveRoomState } from './storage.js'
 
@@ -106,6 +106,8 @@ export function rememberRoom(extra = {}) {
   if (!room.code || room.isSolo) return
   const saved = loadRoomState() || {}
   addRoomToHistory({
+    // Lets a host who rejoins from the list continue where the program was
+    timer: room.isHost ? hostTimerSnapshot(extra.programId) : undefined,
     code: room.code,
     isHost: room.isHost,
     isSpectator: room.isSpectator,
@@ -114,6 +116,28 @@ export function rememberRoom(extra = {}) {
     hostToken: session.host?.hostToken ?? saved.hostToken,
     ...extra,
   })
+}
+
+/**
+ * The host's position for the recent-rooms list. A series that was running
+ * when the host left is stored as stopped. Disconnecting closes the room,
+ * so a later rejoin must not start counting with nobody there.
+ * @param {string | undefined} programId
+ */
+function hostTimerSnapshot(programId) {
+  const timer = get(timerState)
+  if (!programId || timer.programId !== programId) return undefined
+  if (timer.phase !== 'loading' && timer.phase !== 'shooting') return timer
+  return {
+    ...timer,
+    phase: 'stopped',
+    remainingMs: 0,
+    targetVisible: false,
+    phaseEndsAt: null,
+    isReshoot: false,
+    reshootPeerName: null,
+    stoppedReason: interruptedReason(timer),
+  }
 }
 
 /** Tear down everything, forget the saved session and go back home. */

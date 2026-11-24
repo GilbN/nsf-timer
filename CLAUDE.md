@@ -82,6 +82,8 @@ Custom programs are stored in localStorage under key `nsf-timer-custom-programs`
 
 On page load, `App.svelte` calls `restoreSession()` which reads `localStorage` for room and timer state and attempts to reconnect or reclaim the host's room code. All localStorage keys are prefixed with `nsf-timer-`.
 
+Every running countdown records `phaseEndsAt`, its wall-clock end, and a pause records `pausedPhase`. `TimerScheduler.restoreState()` and `resume()` re-arm the engine from that state through `_segmentCompletion()`, which picks what happens next (shooting after loading, target up after a hidden phase, the next duel showing). A host's room history entry keeps a timer snapshot, so rejoining from the recent-rooms list continues at the same position.
+
 ### Malfunction (jam) rules
 
 Max 2 malfunctions per program per peer, max 1 per stage. Tracked in `SocketHost` per connection entry (`jamsUsed`, `jamStageKeys`). Reset on program reset via `SocketHost.resetAllJams()`.

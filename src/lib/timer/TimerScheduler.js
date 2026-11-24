@@ -4,6 +4,31 @@ import { getProgramById } from '../programs/registry.js'
 import { beepStart, beepStop, beepTargetUp, beepTargetDown } from '../audio.js'
 
 /**
+ * Milliseconds left on a saved running countdown. Uses the wall-clock
+ * deadline when the save has one, and the older phaseStartedAt + totalMs
+ * pair otherwise. Returns null when neither is usable.
+ */
+function remainingFromSaved(saved) {
+  if (saved.phaseEndsAt) return saved.phaseEndsAt - Date.now()
+  if (saved.phaseStartedAt && saved.totalMs) return saved.totalMs - (Date.now() - saved.phaseStartedAt)
+  return null
+}
+
+/**
+ * Why a series counts as stopped when it is cut short. An interrupted
+ * reshoot goes back to the result from before the reshoot. seriesIndex
+ * already points past the reshot series, so 'aborted' would make Next
+ * series skip one. A reshoot of the program's last series is the
+ * exception. 'programComplete' hides Restart, and the host should still
+ * be able to rerun the reshoot they stopped.
+ */
+export function interruptedReason(state) {
+  if (!state.isReshoot) return 'aborted'
+  const before = state.preReshootStoppedReason
+  return before && before !== 'programComplete' ? before : 'aborted'
+}
+
+/**
  * Orchestrates the full competition flow:
  * loading -> shooting -> stopped, with duell target toggle phases.
  *
@@ -66,6 +91,8 @@ export class TimerScheduler {
       targetVisible: false,
       duelShowingIndex: 0,
       phaseStartedAt: null,
+      phaseEndsAt: null,
+      pausedPhase: null,
       isReshoot: false,
       reshootPeerName: null,
       stageComplete: false,
@@ -76,51 +103,44 @@ export class TimerScheduler {
 
   /**
    * Restore from saved state (e.g. after host page reload).
-   * If the timer was actively running (loading/shooting), it resumes
-   * the countdown accounting for elapsed time during the reload.
-   * If too much time passed, the phase is set to stopped.
+   * A running countdown picks up where its wall-clock deadline says it
+   * should be, including mid-way through a rapid or duel cycle. If the
+   * deadline passed during the reload, the series is marked stopped.
+   * A paused state comes back paused, and resume() re-arms the engine.
    */
   restoreState(savedState) {
     this.program = getProgramById(savedState.programId)
     if (!this.program) return
+    // A custom program may have been edited since the save. Don't restore a
+    // position that no longer exists. The caller loads the program instead.
+    const exercise = this.program.stages[savedState.stageIndex]?.exercises[savedState.exerciseIndex]
+    if (!exercise || !(savedState.seriesIndex >= 0 && savedState.seriesIndex < exercise.seriesCount)) {
+      this.program = null
+      return
+    }
 
     const wasRunning = savedState.phase === 'loading' || savedState.phase === 'shooting'
-    const wasPaused = savedState.phase === 'paused'
+    const remaining = wasRunning ? remainingFromSaved(savedState) : null
 
-    if (wasRunning && savedState.phaseStartedAt && savedState.totalMs) {
-      // Calculate how much time has elapsed since the phase started
-      const elapsedSinceStart = Date.now() - savedState.phaseStartedAt
-      const remaining = savedState.totalMs - elapsedSinceStart
-
-      if (remaining <= 0) {
-        // Time ran out during reload — mark as stopped
-        this.state = {
-          ...savedState,
-          phase: 'stopped',
-          remainingMs: 0,
-          targetVisible: false,
-          stoppedReason: savedState.stoppedReason ?? 'aborted',
-        }
-      } else {
-        // Time remains — resume the countdown
-        this.state = {
-          ...savedState,
-          remainingMs: remaining,
-        }
-        // A duel can't resume mid-cycle, so it comes back paused.
-        const exercise = this.getCurrentExercise()
-        if (savedState.phase === 'shooting' && this.getCurrentStage()?.type === 'duell' && exercise?.targetVisibleTime) {
-          this.state.phase = 'paused'
-        }
-        // Send a full snapshot first. Countdown ticks alone can't change
-        // the phase clients last saw.
-        this._updateState({})
-        if (this.state.phase !== 'paused') this._resumeCountdown(remaining, savedState.phase)
-        return
+    if (remaining !== null && remaining <= 0) {
+      this.state = {
+        ...savedState,
+        phase: 'stopped',
+        remainingMs: 0,
+        targetVisible: false,
+        phaseEndsAt: null,
+        pausedPhase: null,
+        isReshoot: false,
+        reshootPeerName: null,
+        stoppedReason: interruptedReason(savedState),
       }
-    } else if (wasPaused) {
-      // Paused state restores as-is — host can resume manually
+    } else if (remaining !== null) {
       this.state = { ...savedState }
+      // Send a full snapshot first. Countdown ticks alone can't change
+      // the phase clients last saw.
+      this._updateState({ remainingMs: remaining, phaseEndsAt: Date.now() + remaining })
+      this.engine.startCountdown(remaining, (r) => this._tickState(r), this._segmentCompletion())
+      return
     } else {
       this.state = { ...savedState }
     }
@@ -129,23 +149,33 @@ export class TimerScheduler {
   }
 
   /**
-   * Resume a countdown after restore with the given remaining time.
+   * What should happen when the countdown that is currently on screen ends.
+   * Lets a countdown be re-armed after a reload or a resume without knowing
+   * which code path started it.
    */
-  _resumeCountdown(remainingMs, phase) {
-    if (phase === 'loading') {
-      this.engine.startCountdown(remainingMs, (remaining) => {
-        this._tickState(remaining)
-      }, () => {
-        this._startShooting()
-      })
-    } else if (phase === 'shooting') {
-      // Duels never get here. restoreState brings them back paused.
-      this.engine.startCountdown(remainingMs, (remaining) => {
-        this._tickState(remaining)
-      }, () => {
-        this._seriesComplete()
-      })
+  _segmentCompletion() {
+    const stage = this.getCurrentStage()
+    const exercise = this.getCurrentExercise()
+    if (this.state.phase === 'loading') return () => this._startShooting()
+    if (stage?.type === 'duell' && exercise?.targetVisibleTime) {
+      const total = Math.ceil(exercise.shotsPerSeries / exercise.shotsPerShowing)
+      const showing = this.state.duelShowingIndex ?? 0
+      return this.state.targetVisible
+        ? () => this._hideDuelTarget(exercise, showing, total)
+        : () => this._showDuelTarget(exercise, showing, total)
     }
+    if (exercise?.targetHiddenTime) {
+      return this.state.targetVisible
+        ? () => { beepTargetDown(); this._seriesComplete() }
+        : () => this._showRapidTarget(exercise)
+    }
+    return () => this._seriesComplete()
+  }
+
+  /** Update state for a new countdown segment and start the engine on it. */
+  _startSegment(partial, ms, onComplete) {
+    this._updateState({ ...partial, remainingMs: ms, totalMs: ms, phaseEndsAt: Date.now() + ms })
+    this.engine.startCountdown(ms, (r) => this._tickState(r), onComplete)
   }
 
   getCurrentStage() {
@@ -181,26 +211,17 @@ export class TimerScheduler {
     this._clearDuelTimer()
 
     const loadingMs = (exercise.loadingTime || 60) * 1000
-    this._updateState({
+    beepStart()
+    this._startSegment({
       phase: 'loading',
       seriesIndex: seriesIdx,
-      remainingMs: loadingMs,
-      totalMs: loadingMs,
       targetVisible: false,
       phaseStartedAt: Date.now(),
       isReshoot: false,
       reshootPeerName: null,
       stageComplete: false,
       stoppedReason: null,
-    })
-
-    beepStart()
-
-    this.engine.startCountdown(loadingMs, (remaining) => {
-      this._tickState(remaining)
-    }, () => {
-      this._startShooting()
-    })
+    }, loadingMs, () => this._startShooting())
   }
 
   /**
@@ -270,29 +291,19 @@ export class TimerScheduler {
     this.engine.stop()
     this._clearDuelTimer()
 
-    // Stash the pre-reshoot stoppedReason so nextSeries()/restartSeries()
-    // can resume correctly after the reshoot completes.
-    this._preReshootStoppedReason = this.state.stoppedReason ?? null
-
     const loadingMs = (exercise.loadingTime || 60) * 1000
-    this._updateState({
+    beepStart()
+    this._startSegment({
+      // Kept in state, not on the instance, so it survives a reload. After
+      // the reshoot, nextSeries()/restartSeries() continue from it.
+      preReshootStoppedReason: this.state.stoppedReason ?? null,
       phase: 'loading',
-      remainingMs: loadingMs,
-      totalMs: loadingMs,
       targetVisible: false,
       phaseStartedAt: Date.now(),
       isReshoot: true,
       reshootPeerName: peerName,
       stoppedReason: null,
-    })
-
-    beepStart()
-
-    this.engine.startCountdown(loadingMs, (remaining) => {
-      this._tickState(remaining)
-    }, () => {
-      this._startShooting()
-    })
+    }, loadingMs, () => this._startShooting())
   }
 
   _startShooting() {
@@ -312,51 +323,27 @@ export class TimerScheduler {
   }
 
   _startPrecisionShooting(exercise) {
-    const totalMs = exercise.timePerSeries * 1000
-    this._updateState({
+    this._startSegment({
       phase: 'shooting',
-      remainingMs: totalMs,
-      totalMs,
       targetVisible: true,
       phaseStartedAt: Date.now(),
-    })
-
-    this.engine.startCountdown(totalMs, (remaining) => {
-      this._tickState(remaining)
-    }, () => {
-      this._seriesComplete()
-    })
+    }, exercise.timePerSeries * 1000, () => this._seriesComplete())
   }
 
   _startRapidShooting(exercise) {
     // Hidden phase first
-    this._updateState({
+    this._startSegment({
       phase: 'shooting',
       targetVisible: false,
-      remainingMs: exercise.targetHiddenTime * 1000,
-      totalMs: exercise.targetHiddenTime * 1000,
       phaseStartedAt: Date.now(),
-    })
+    }, exercise.targetHiddenTime * 1000, () => this._showRapidTarget(exercise))
+  }
 
-    this.engine.startCountdown(exercise.targetHiddenTime * 1000, (remaining) => {
-      this._tickState(remaining)
-    }, () => {
-      // Visible phase
-      const visibleMs = exercise.timePerSeries * 1000
-      this._updateState({
-        targetVisible: true,
-        remainingMs: visibleMs,
-        totalMs: visibleMs,
-      })
-
-      beepTargetUp()
-
-      this.engine.startCountdown(visibleMs, (remaining) => {
-        this._tickState(remaining)
-      }, () => {
-        beepTargetDown()
-        this._seriesComplete()
-      })
+  _showRapidTarget(exercise) {
+    beepTargetUp()
+    this._startSegment({ targetVisible: true, phaseStartedAt: Date.now() }, exercise.timePerSeries * 1000, () => {
+      beepTargetDown()
+      this._seriesComplete()
     })
   }
 
@@ -379,32 +366,22 @@ export class TimerScheduler {
     }
 
     // Hidden phase first
-    this._updateState({
+    this._startSegment({
       targetVisible: false,
       duelShowingIndex: showingIndex,
-      remainingMs: exercise.targetHiddenTime * 1000,
-      totalMs: exercise.targetHiddenTime * 1000,
-    })
+      phaseStartedAt: Date.now(),
+    }, exercise.targetHiddenTime * 1000, () => this._showDuelTarget(exercise, showingIndex, totalShowings))
+  }
 
-    this.engine.startCountdown(exercise.targetHiddenTime * 1000, (remaining) => {
-      this._tickState(remaining)
-    }, () => {
-      // Then visible phase
-      this._updateState({
-        targetVisible: true,
-        remainingMs: exercise.targetVisibleTime * 1000,
-        totalMs: exercise.targetVisibleTime * 1000,
-      })
+  _showDuelTarget(exercise, showingIndex, totalShowings) {
+    beepTargetUp()
+    this._startSegment({ targetVisible: true, phaseStartedAt: Date.now() }, exercise.targetVisibleTime * 1000,
+      () => this._hideDuelTarget(exercise, showingIndex, totalShowings))
+  }
 
-      beepTargetUp()
-
-      this.engine.startCountdown(exercise.targetVisibleTime * 1000, (remaining) => {
-        this._tickState(remaining)
-      }, () => {
-        beepTargetDown()
-        this._runDuelCycle(exercise, showingIndex + 1, totalShowings)
-      })
-    })
+  _hideDuelTarget(exercise, showingIndex, totalShowings) {
+    beepTargetDown()
+    this._runDuelCycle(exercise, showingIndex + 1, totalShowings)
   }
 
   _seriesComplete() {
@@ -418,9 +395,9 @@ export class TimerScheduler {
       // Restore the pre-reshoot stoppedReason so the series state-machine
       // (nextSeries/restartSeries) picks up where it left off rather than
       // treating the reshoot as a manual abort.
-      const restoredReason = this._preReshootStoppedReason ?? null
-      this._preReshootStoppedReason = null
+      const restoredReason = this.state.preReshootStoppedReason ?? null
       this._updateState({
+        preReshootStoppedReason: null,
         phase: 'stopped',
         remainingMs: 0,
         targetVisible: false,
@@ -521,21 +498,28 @@ export class TimerScheduler {
   pause() {
     if (this.state.phase !== 'shooting' && this.state.phase !== 'loading') return
     this.engine.pause()
-    this._updateState({ phase: 'paused', remainingMs: this.engine.remainingMs })
+    this._updateState({
+      phase: 'paused',
+      pausedPhase: this.state.phase,
+      remainingMs: this.engine.remainingMs,
+      phaseEndsAt: null,
+    })
   }
 
   resume() {
     if (this.state.phase !== 'paused') return
-    this.engine.resume()
     const exercise = this.getCurrentExercise()
-    const isLoading = this.state.totalMs === (exercise?.loadingTime || 60) * 1000
-      && this.state.remainingMs > 0
+    // States saved before pausedPhase existed: guess from the segment length
+    const phase = this.state.pausedPhase
+      ?? (!this.state.targetVisible && this.state.totalMs === (exercise?.loadingTime || 60) * 1000 ? 'loading' : 'shooting')
+    const remaining = this.state.remainingMs
 
-    this._updateState({
-      phase: isLoading ? 'loading' : 'shooting',
-      phaseStartedAt: Date.now(),
-      stoppedReason: null,
-    })
+    this.state = { ...this.state, phase, pausedPhase: null }
+    // Re-arm instead of calling engine.resume(). After a reload the engine has
+    // no countdown to resume.
+    this.engine.stop()
+    this._updateState({ phaseEndsAt: Date.now() + remaining, phaseStartedAt: Date.now(), stoppedReason: null })
+    this.engine.startCountdown(remaining, (r) => this._tickState(r), this._segmentCompletion())
   }
 
   reset() {
@@ -555,6 +539,8 @@ export class TimerScheduler {
         phaseStartedAt: null,
         isReshoot: false,
         reshootPeerName: null,
+        phaseEndsAt: null,
+        pausedPhase: null,
         stageComplete: false,
         stoppedReason: null,
       })
@@ -588,6 +574,8 @@ export class TimerScheduler {
       phaseStartedAt: null,
       isReshoot: false,
       reshootPeerName: null,
+      phaseEndsAt: null,
+      pausedPhase: null,
       stageComplete: false,
       stoppedReason: null,
     })
@@ -602,7 +590,9 @@ export class TimerScheduler {
       targetVisible: false,
       isReshoot: false,
       reshootPeerName: null,
-      stoppedReason: 'aborted',
+      phaseEndsAt: null,
+      pausedPhase: null,
+      stoppedReason: interruptedReason(this.state),
     })
   }
 

@@ -696,4 +696,194 @@ describe('TimerScheduler', () => {
       expect(get(timerState).remainingMs).toBe(scheduler.engine.remainingMs)
     })
   })
+
+  describe('reload and resume', () => {
+    // Simulate a page reload. A fresh scheduler restores the last saved state.
+    function reload() {
+      const saved = JSON.parse(JSON.stringify(scheduler.state))
+      scheduler.destroy()
+      scheduler = new TimerScheduler()
+      scheduler.restoreState(saved)
+    }
+
+    it('restores the right time after a pause and resume', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries() // 60s loading
+      vi.advanceTimersByTime(20_000)
+      scheduler.pause()
+      vi.advanceTimersByTime(30_000) // paused time must not count
+      scheduler.resume()
+      vi.advanceTimersByTime(10_000) // 30s of loading left
+      reload()
+
+      expect(scheduler.state.phase).toBe('loading')
+      expect(scheduler.state.remainingMs).toBeGreaterThan(29_000)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(30_000)
+    })
+
+    it('restores the right time in the visible part of a rapid series', () => {
+      scheduler.loadProgram('silhuett')
+      scheduler.jumpTo(1, 0, 0) // 7s hidden, 8s visible
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      vi.advanceTimersByTime(3_000)
+      reload()
+
+      expect(scheduler.state.targetVisible).toBe(true)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(5_000)
+      expect(scheduler.state.remainingMs).toBeGreaterThan(4_500)
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('stopped')
+    })
+
+    it('shows the target after a reload in the hidden part of a rapid series', () => {
+      scheduler.loadProgram('silhuett')
+      scheduler.jumpTo(1, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      vi.advanceTimersByTime(3_000) // 4s of hidden time left
+      reload()
+
+      expect(scheduler.state.targetVisible).toBe(false)
+      runPhase(4_000)
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+    })
+
+    it('counts down when resuming a series that was paused before a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      vi.advanceTimersByTime(50_000)
+      scheduler.pause() // 10s of loading left
+      reload()
+      expect(scheduler.state.phase).toBe('paused')
+
+      scheduler.resume()
+      expect(scheduler.state.phase).toBe('loading')
+      vi.advanceTimersByTime(5_000)
+      expect(scheduler.state.remainingMs).toBeLessThanOrEqual(5_000)
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
+
+    it('carries on a duel after a reload mid-cycle', () => {
+      scheduler.loadProgram('fingrov')
+      scheduler.jumpTo(3, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000) // first showing is up
+      reload()
+
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+      runPhase(3_290)
+      expect(scheduler.state.targetVisible).toBe(false)
+      expect(scheduler.state.duelShowingIndex).toBe(1)
+    })
+
+    it('resumes a duel that was paused before a reload', () => {
+      scheduler.loadProgram('fingrov')
+      scheduler.jumpTo(3, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      vi.advanceTimersByTime(2_000)
+      scheduler.pause() // 5s of the first hidden time left
+      reload()
+
+      scheduler.resume()
+      runPhase(5_000)
+      expect(scheduler.state.phase).toBe('shooting')
+      expect(scheduler.state.targetVisible).toBe(true)
+      expect(scheduler.state.duelShowingIndex).toBe(0)
+    })
+
+    it('remembers the pre-reshoot result across a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      runPhase(150_000) // the one sighting series is done
+      const before = scheduler.state.stoppedReason
+      expect(before).toBe('stageComplete')
+      scheduler.startReshoot('Ola')
+      vi.advanceTimersByTime(1_000)
+      reload()
+      runPhase(59_000)
+      runPhase(7_000)
+      runPhase(150_000)
+      expect(scheduler.state.isReshoot).toBe(false)
+      expect(scheduler.state.stoppedReason).toBe(before)
+    })
+
+    it('refuses to restore a position the program no longer has', () => {
+      scheduler.restoreState({ phase: 'idle', programId: 'standard', stageIndex: 99, exerciseIndex: 0, seriesIndex: 0 })
+      expect(scheduler.program).toBeNull()
+    })
+
+    it('restores a running save from the previous version (no phaseEndsAt)', () => {
+      vi.setSystemTime(new Date('2026-04-17T10:00:00Z'))
+      scheduler.restoreState({
+        phase: 'loading', programId: 'standard', stageIndex: 1, exerciseIndex: 0, seriesIndex: 0,
+        phaseStartedAt: Date.parse('2026-04-17T09:59:40Z'), totalMs: 60_000, remainingMs: 60_000, targetVisible: false,
+      })
+      expect(scheduler.state.phase).toBe('loading')
+      expect(scheduler.state.remainingMs).toBe(40_000)
+      runPhase(40_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
+
+    it('resumes a paused save from the previous version (no pausedPhase)', () => {
+      scheduler.restoreState({
+        phase: 'paused', programId: 'standard', stageIndex: 1, exerciseIndex: 0, seriesIndex: 0,
+        totalMs: 60_000, remainingMs: 15_000, targetVisible: false,
+      })
+      scheduler.resume()
+      expect(scheduler.state.phase).toBe('loading')
+      runPhase(15_000)
+      expect(scheduler.state.phase).toBe('shooting')
+    })
+
+    it('does not skip a series when a reshoot is stopped or outlasted by a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.jumpTo(1, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      runPhase(150_000)
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+      expect(scheduler.state.seriesIndex).toBe(1)
+
+      // Stopping the reshoot keeps 'seriesComplete', so Next series runs series 2
+      scheduler.startReshoot('Ola')
+      scheduler.stop()
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+
+      // A reload after the reshoot's countdown would have ended does the same
+      scheduler.startReshoot('Ola')
+      const saved = JSON.parse(JSON.stringify(scheduler.state))
+      vi.advanceTimersByTime(120_000)
+      scheduler.destroy()
+      scheduler = new TimerScheduler()
+      scheduler.restoreState(saved)
+      expect(scheduler.state.phase).toBe('stopped')
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+      expect(scheduler.state.isReshoot).toBe(false)
+    })
+
+    it('keeps Restart available after stopping a reshoot of the last series', () => {
+      scheduler.loadProgram('standard')
+      const last = scheduler.program.stages.length - 1
+      const exercises = scheduler.program.stages[last].exercises
+      const lastEx = exercises.length - 1
+      scheduler.jumpTo(last, lastEx, exercises[lastEx].seriesCount - 1)
+      scheduler._seriesComplete()
+      expect(scheduler.state.stoppedReason).toBe('programComplete')
+
+      scheduler.startReshoot('Ola')
+      scheduler.stop()
+      expect(scheduler.state.stoppedReason).toBe('aborted')
+      expect(scheduler.state.seriesIndex).toBe(exercises[lastEx].seriesCount - 1)
+    })
+  })
 })

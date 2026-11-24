@@ -19,9 +19,10 @@ vi.mock('../../src/lib/peer/SocketHost.js', () => ({
   },
 }))
 
-const { session, startScheduler, stopScheduler, hostRoom } = await import('../../src/lib/session.js')
+const { session, startScheduler, stopScheduler, hostRoom, rememberRoom } = await import('../../src/lib/session.js')
+const { loadRoomHistory } = await import('../../src/lib/storage.js')
 const { confirmAction, confirmRequest } = await import('../../src/lib/confirm.js')
-const { currentView } = await import('../../src/lib/stores.js')
+const { currentView, roomState, timerState } = await import('../../src/lib/stores.js')
 const { get } = await import('svelte/store')
 
 describe('startScheduler', () => {
@@ -70,5 +71,57 @@ describe('hostRoom replacement', () => {
     expect(session.scheduler).toBeNull()
     expect(get(currentView)).toBe('home')
     expect(host).toBe(fakeHosts.at(-1))
+  })
+})
+
+describe('rememberRoom', () => {
+  afterEach(() => {
+    stopScheduler()
+    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
+  })
+
+  it('keeps the host\'s position so a rejoin from the list continues there', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, phase: 'stopped', programId: 'standard', stageIndex: 2, seriesIndex: 1, stoppedReason: 'seriesComplete' }))
+    rememberRoom({ programId: 'standard' })
+
+    const entry = loadRoomHistory()[0]
+    expect(entry.timer.stageIndex).toBe(2)
+
+    const scheduler = startScheduler(entry.programId, entry.timer)
+    expect(scheduler.state.stageIndex).toBe(2)
+    expect(scheduler.state.seriesIndex).toBe(1)
+  })
+
+  it('does not store a timer for shooters', () => {
+    roomState.set({ code: 'WXYZ', isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, programId: 'standard' }))
+    rememberRoom()
+    expect(loadRoomHistory()[0].timer).toBeUndefined()
+  })
+
+  it('stores a running series as stopped, so a rejoin does not start counting', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, phase: 'shooting', programId: 'standard', stageIndex: 1, targetVisible: true, phaseEndsAt: Date.now() + 60_000 }))
+    rememberRoom({ programId: 'standard' })
+
+    const { timer } = loadRoomHistory()[0]
+    expect(timer.phase).toBe('stopped')
+    expect(timer.stoppedReason).toBe('aborted')
+    expect(timer.stageIndex).toBe(1)
+  })
+
+  it('does not store a timer from another program', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, programId: 'standard' }))
+    rememberRoom()
+    expect(loadRoomHistory()[0].timer).toBeUndefined()
+  })
+
+  it('stores an interrupted reshoot with its pre-reshoot result', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, phase: 'loading', programId: 'standard', isReshoot: true, preReshootStoppedReason: 'seriesComplete' }))
+    rememberRoom({ programId: 'standard' })
+    expect(loadRoomHistory()[0].timer.stoppedReason).toBe('seriesComplete')
   })
 })
