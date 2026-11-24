@@ -315,8 +315,11 @@
   @media (orientation: landscape) and (min-width: 700px) {
     .timer-view { max-width: 1100px; }
     .body { flex-direction: row; align-items: stretch; }
-    .panel { width: min(44%, 440px); display: flex; flex-direction: column; justify-content: flex-end; }
+    .panel { width: min(44%, 440px); display: flex; flex-direction: column; }
     .tiles { height: auto; flex: 1; }
+    /* The keys take the full height beside the display */
+    .panel :global(.keypad) { flex: 1; }
+    .panel :global(.keypad .main) { flex: 1; height: auto; }
   }
 
   /* Short landscape phones: keep the keys compact */
