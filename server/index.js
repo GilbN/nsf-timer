@@ -16,7 +16,7 @@ const CLOSE_HOST_REPLACED = 4001
 const DEFAULT_HOST_GRACE_PERIOD = 60_000 * 30 // 30 minutes for host to reconnect
 let HOST_GRACE_PERIOD = DEFAULT_HOST_GRACE_PERIOD
 
-// roomCode → { host: WebSocket|null, hostToken: string, clients: Map<peerId, { ws, name, lane }>, lastState: object|null, graceTimer: number|null }
+// roomCode → { host: WebSocket|null, hostToken: string, clients: Map<peerId, { ws, name, lane, isSpectator }>, lastState: object|null, graceTimer: number|null }
 const rooms = new Map()
 
 let nextPeerId = 1
