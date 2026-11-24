@@ -98,7 +98,11 @@
     const dy = y - d.startY
     if (!d.dragging) {
       if (dy < -SLOP) drag = null
-      if (dy <= SLOP) return false
+      if (dy <= SLOP) {
+        d.lastY = y
+        d.lastT = t
+        return false
+      }
       d.dragging = true
       dialog.getAnimations().forEach(a => a.cancel())
     }

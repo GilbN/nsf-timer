@@ -78,17 +78,26 @@ describe('Modal', () => {
 
     it('closes when the sheet is pulled down', async () => {
       expect(await closesAfter((p) => {
-        const moves = swipe(p, [100, 140, 220, 320])
+        const moves = swipe(p, [100, 140, 220, 320], 200)
         expect(moves.every(e => e.defaultPrevented)).toBe(true)
       })).toBe(1)
     })
 
     it('snaps back from a short slow pull', async () => {
-      expect(await closesAfter((p) => { swipe(p, [100, 130, 160, 190], 200) })).toBe(0)
+      expect(await closesAfter((p) => { swipe(p, [100, 115, 130, 145], 50) })).toBe(0)
     })
 
     it('closes on a short flick, even with one move', async () => {
       expect(await closesAfter((p) => { swipe(p, [100, 160], 30) })).toBe(1)
+    })
+
+    it('closes on a flick after holding the press', async () => {
+      expect(await closesAfter((p) => {
+        touch('touchstart', p, 100, 0)
+        touch('touchmove', p, 105, 500)
+        touch('touchmove', p, 165, 530)
+        touch('touchend', p, 165, 560)
+      })).toBe(1)
     })
 
     it('leaves a tap and an upward scroll alone', async () => {
