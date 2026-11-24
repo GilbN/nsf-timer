@@ -1,7 +1,7 @@
 import { get } from 'svelte/store'
 import { SocketHost } from './peer/SocketHost.js'
 import { SocketClient } from './peer/SocketClient.js'
-import { TimerScheduler } from './timer/TimerScheduler.js'
+import { TimerScheduler, interruptedReason } from './timer/TimerScheduler.js'
 import { currentView, roomState, timerState } from './stores.js'
 import { confirmRequest } from './confirm.js'
 import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState, saveRoomState } from './storage.js'
@@ -136,7 +136,7 @@ function hostTimerSnapshot(programId) {
     phaseEndsAt: null,
     isReshoot: false,
     reshootPeerName: null,
-    stoppedReason: 'aborted',
+    stoppedReason: interruptedReason(timer),
   }
 }
 

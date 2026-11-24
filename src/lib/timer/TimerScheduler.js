@@ -15,6 +15,17 @@ function remainingFromSaved(saved) {
 }
 
 /**
+ * Why a series counts as stopped when it is cut short. An interrupted
+ * reshoot goes back to the result from before the reshoot: seriesIndex
+ * already points past the reshot series, so 'aborted' would make Next
+ * series skip one.
+ */
+export function interruptedReason(state) {
+  if (state.isReshoot) return state.preReshootStoppedReason ?? 'aborted'
+  return 'aborted'
+}
+
+/**
  * Orchestrates the full competition flow:
  * loading -> shooting -> stopped, with duell target toggle phases.
  *
@@ -118,7 +129,7 @@ export class TimerScheduler {
         pausedPhase: null,
         isReshoot: false,
         reshootPeerName: null,
-        stoppedReason: savedState.stoppedReason ?? 'aborted',
+        stoppedReason: interruptedReason(savedState),
       }
     } else if (remaining !== null) {
       this.state = { ...savedState }
@@ -578,7 +589,7 @@ export class TimerScheduler {
       reshootPeerName: null,
       phaseEndsAt: null,
       pausedPhase: null,
-      stoppedReason: 'aborted',
+      stoppedReason: interruptedReason(this.state),
     })
   }
 

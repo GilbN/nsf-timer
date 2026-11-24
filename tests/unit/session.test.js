@@ -117,4 +117,11 @@ describe('rememberRoom', () => {
     rememberRoom()
     expect(loadRoomHistory()[0].timer).toBeUndefined()
   })
+
+  it('stores an interrupted reshoot with its pre-reshoot result', () => {
+    roomState.set({ code: 'WXYZ', isHost: true, isSpectator: false, isSolo: false, connectedPeers: [] })
+    timerState.update((s) => ({ ...s, phase: 'loading', programId: 'standard', isReshoot: true, preReshootStoppedReason: 'seriesComplete' }))
+    rememberRoom({ programId: 'standard' })
+    expect(loadRoomHistory()[0].timer.stoppedReason).toBe('seriesComplete')
+  })
 })

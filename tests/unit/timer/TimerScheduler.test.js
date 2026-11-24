@@ -843,5 +843,32 @@ describe('TimerScheduler', () => {
       runPhase(15_000)
       expect(scheduler.state.phase).toBe('shooting')
     })
+
+    it('does not skip a series when a reshoot is stopped or outlasted by a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.jumpTo(1, 0, 0)
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      runPhase(150_000)
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+      expect(scheduler.state.seriesIndex).toBe(1)
+
+      // Stopping the reshoot keeps 'seriesComplete', so Next series runs series 2
+      scheduler.startReshoot('Ola')
+      scheduler.stop()
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+
+      // A reload after the reshoot's countdown would have ended does the same
+      scheduler.startReshoot('Ola')
+      const saved = JSON.parse(JSON.stringify(scheduler.state))
+      vi.advanceTimersByTime(120_000)
+      scheduler.destroy()
+      scheduler = new TimerScheduler()
+      scheduler.restoreState(saved)
+      expect(scheduler.state.phase).toBe('stopped')
+      expect(scheduler.state.stoppedReason).toBe('seriesComplete')
+      expect(scheduler.state.isReshoot).toBe(false)
+    })
   })
 })
