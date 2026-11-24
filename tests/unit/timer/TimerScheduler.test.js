@@ -797,5 +797,28 @@ describe('TimerScheduler', () => {
       expect(scheduler.state.targetVisible).toBe(true)
       expect(scheduler.state.duelShowingIndex).toBe(0)
     })
+
+    it('remembers the pre-reshoot result across a reload', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      runPhase(60_000)
+      runPhase(7_000)
+      runPhase(150_000) // the one sighting series is done
+      const before = scheduler.state.stoppedReason
+      expect(before).toBe('stageComplete')
+      scheduler.startReshoot('Ola')
+      vi.advanceTimersByTime(1_000)
+      reload()
+      runPhase(59_000)
+      runPhase(7_000)
+      runPhase(150_000)
+      expect(scheduler.state.isReshoot).toBe(false)
+      expect(scheduler.state.stoppedReason).toBe(before)
+    })
+
+    it('refuses to restore a position the program no longer has', () => {
+      scheduler.restoreState({ phase: 'idle', programId: 'standard', stageIndex: 99, exerciseIndex: 0, seriesIndex: 0 })
+      expect(scheduler.program).toBeNull()
+    })
   })
 })

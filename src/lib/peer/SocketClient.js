@@ -74,7 +74,7 @@ export class SocketClient {
           if (envelope.action === 'ERROR') {
             clearTimeout(timeout)
             const reason = envelope.reason === 'lane_taken' ? 'laneRejected' : envelope.reason
-            if (this._reconnectAttempt > 0) {
+            if (this._reconnectAttempt > 0 && envelope.reason === 'room_not_found') {
               // Rejoining after a drop. After a relay restart the host may
               // not have re-created the room yet, so let _autoReconnect try
               // again instead of giving up.
@@ -115,9 +115,8 @@ export class SocketClient {
       ws.onclose = () => {
         clearTimeout(timeout)
         if (!this._joined && !this._destroyed) {
-          if (this._reconnectAttempt === 0) {
-            reject(new Error('Could not connect to room'))
-          }
+          // Reject on retries too, or _autoReconnect would wait forever
+          reject(new Error('Could not connect to room'))
           return
         }
         if (!this._destroyed && !this._roomClosed) {

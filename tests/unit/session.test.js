@@ -100,4 +100,3 @@ describe('rememberRoom', () => {
     expect(loadRoomHistory()[0].timer).toBeUndefined()
   })
 })
-

@@ -265,6 +265,28 @@ describe('SocketClient after a relay restart', () => {
   }, 15_000)
 })
 
+describe('SocketClient losing its lane during a drop', () => {
+  it('reports laneRejected instead of retrying when the lane was taken', async () => {
+    const host = await createHost(server.url)
+    const client = new SocketClient()
+    const statuses = []
+    client.onStatusChange((s) => statuses.push(s))
+    await client.joinRoom(host.code, { name: 'A', lane: '1' })
+
+    // Drop the connection. Someone else takes lane 1 before the retry.
+    client.ws.close()
+    await new Promise((r) => setTimeout(r, 100))
+    const other = new SocketClient()
+    await other.joinRoom(host.code, { name: 'B', lane: '1' })
+
+    await vi.waitFor(() => expect(statuses).toContain('laneRejected'), { timeout: 4000 })
+    expect(client._destroyed).toBe(true)
+
+    other.destroy()
+    await host.ws.close()
+  }, 10_000)
+})
+
 describe('SocketClient destroy', () => {
   it('stops reconnect attempts and clears roomState', async () => {
     const host = await createHost(server.url)
