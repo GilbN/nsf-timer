@@ -30,22 +30,23 @@ describe('ConfirmDialog', () => {
     document.body.innerHTML = ''
   })
 
-  it('does not let the first dialog\'s late close event cancel the next confirm', async () => {
+  it('keeps a confirm that replaces one still on screen', async () => {
     app = mount(ConfirmDialog, { target: document.body })
     const first = confirmAction('First?', 'OK')
     flushSync()
-    document.querySelector('dialog .btn-primary').dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await expect(first).resolves.toBe(true)
 
-    // A caller asks again right away, before the old dialog's close event runs
+    // A second confirm arrives while the first dialog is still open. The
+    // first answers false and its dialog unmounts, firing a late close.
     let secondAnswer = 'pending'
     confirmAction('Second?', 'OK').then((ok) => { secondAnswer = ok })
     flushSync()
+    await expect(first).resolves.toBe(false)
     await new Promise((r) => setTimeout(r, 20))
     await tick()
 
     expect(secondAnswer).toBe('pending')
     expect(get(confirmRequest)?.message).toBe('Second?')
+    expect(document.querySelector('dialog')?.open).toBe(true)
   })
 
   it('answers false when the dialog is closed with Escape', async () => {

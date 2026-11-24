@@ -25,19 +25,28 @@
   })
 
   // The browser sends clicks on ::backdrop to the <dialog> itself, and a
-  // drag between the panel and the backdrop also lands there. Only close
-  // when both the press and the release were on the backdrop.
+  // drag between the panel and the backdrop also lands there. Touch input
+  // captures the pointer, so the release target can't be trusted either.
+  // Only close when the press and the release were both outside the
+  // dialog's box, which is the panel's box.
   let pressedOnBackdrop = false
   let releasedOnBackdrop = false
 
   /** @param {PointerEvent} e */
+  function isOutside(e) {
+    if (!dialog) return false
+    const r = dialog.getBoundingClientRect()
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom
+  }
+
+  /** @param {PointerEvent} e */
   function onPointerDown(e) {
-    pressedOnBackdrop = e.target === dialog
+    pressedOnBackdrop = e.target === dialog && isOutside(e)
   }
 
   /** @param {PointerEvent} e */
   function onPointerUp(e) {
-    releasedOnBackdrop = e.target === dialog
+    releasedOnBackdrop = isOutside(e)
   }
 
   /** @param {MouseEvent} e */
