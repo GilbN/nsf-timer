@@ -34,6 +34,20 @@ describe('relay server: http and limits', () => {
     await ws.close()
   })
 
+  it('passes only string names and lanes on to the host', async () => {
+    const host = await connect(server.url)
+    host.send({ action: 'CREATE_ROOM', code: 'NMLN' })
+    await host.waitFor('ROOM_CREATED')
+    const client = await connect(server.url)
+    client.send({ action: 'JOIN_ROOM', code: 'NMLN', name: 5, lane: { x: 1 } })
+    await client.waitFor('JOINED')
+    const joined = await host.waitFor('PEER_JOINED')
+    expect(joined.name).toBe('')
+    expect(joined.lane).toBe('')
+    await client.close()
+    await host.close()
+  })
+
   it('drops messages over the rate limit without closing the socket', async () => {
     const ws = await connect(server.url)
     let pongs = 0

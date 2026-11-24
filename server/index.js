@@ -124,6 +124,9 @@ function handleCreateRoom(ws, { code, hostToken }) {
 }
 
 function handleJoinRoom(ws, { code, name, lane, role }) {
+  // The host sorts peers by name and lane and would throw on other types
+  name = typeof name === 'string' ? name.slice(0, 40) : ''
+  lane = typeof lane === 'string' ? lane.slice(0, 10) : ''
   if (getRoomForClient(ws)) {
     send(ws, { action: 'ERROR', reason: 'already_in_room' })
     return
