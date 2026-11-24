@@ -8,7 +8,7 @@
   import Display from '../components/ui/Display.svelte'
   import Meter from '../components/ui/Meter.svelte'
   import Icon from '../components/ui/Icon.svelte'
-  import { signalFor } from '../lib/signal.js'
+  import { signalFor, onNextUpdate } from '../lib/signal.js'
   import { seriesLabel, seriesProgress, exerciseFacts, clockText } from '../lib/timer/progress.js'
 
   let connectionStatus = $state('connected')
@@ -29,7 +29,11 @@
 
   // While the connection is down the last state may be stale: lamp off and
   // a dark display rather than an Ild that may no longer be true
-  let live = $derived(connectionStatus === 'connected')
+  let awaitingFresh = $state(false)
+  /** @type {(() => void) | undefined} */
+  let stopWaiting
+  $effect(() => () => stopWaiting?.())
+  let live = $derived(connectionStatus === 'connected' && !awaitingFresh)
   let signal = $derived(live ? signalFor($timerState) : { lamp: 'off', lit: false })
   let progress = $derived(seriesProgress(exercise, $timerState))
   let facts = $derived(exerciseFacts(stage, exercise, $t))
@@ -59,6 +63,12 @@
     const client = session.client
     if (client) {
       client.onStatusChange((status) => {
+        if (status === 'connected' && connectionStatus !== 'connected') {
+          // Back after a drop: stay dark until the host's fresh state arrives
+          awaitingFresh = true
+          stopWaiting?.()
+          stopWaiting = onNextUpdate(timerState, () => { awaitingFresh = false })
+        }
         if (status === 'connected') connectionStatus = 'connected'
         else if (status === 'reconnecting') connectionStatus = 'reconnecting'
         else if (status === 'roomClosed') connectionStatus = 'roomClosed'
@@ -143,6 +153,7 @@
   .spectator {
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     padding: calc(env(safe-area-inset-top, 0px) + 6px) var(--pad-x) calc(env(safe-area-inset-bottom, 0px) + 12px);
@@ -171,7 +182,7 @@
   .notice :global(svg) { width: 1.2em; height: 1.2em; flex: none; }
   .notice small { display: block; font-size: 0.7em; font-weight: 600; color: var(--ink-soft); }
 
-  :global(.spectator-display) { flex: 1; min-height: 0; padding: 30px clamp(18px, 3vw, 36px) clamp(16px, 2.5vw, 28px) !important; }
+  :global(.spectator-display) { flex: 1; min-height: min-content; padding: 30px clamp(18px, 3vw, 36px) clamp(16px, 2.5vw, 28px) !important; }
 
   .chips { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
 
@@ -205,7 +216,7 @@
 
   .time {
     flex: 1;
-    min-height: 0;
+    min-height: clamp(96px, 24dvh, 260px);
     container-type: size;
     display: flex;
     align-items: flex-end;
@@ -221,7 +232,7 @@
   }
 
   .time[data-tone='live'] .digits { color: #e4e4e7; }
-  .time[data-tone='paused'] .digits { color: #b4b4b9; }
+  .time[data-tone='paused'] .digits { color: var(--soft); }
   .time[data-tone='rest'] .digits { color: var(--muted); }
   :global(.display.lit) .time .digits { color: var(--ink); }
 

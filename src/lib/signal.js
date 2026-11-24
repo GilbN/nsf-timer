@@ -16,3 +16,28 @@ export function signalFor(state) {
   if (phase === 'shooting' && targetVisible) return { lamp: 'green', lit: true }
   return { lamp: 'red', lit: false }
 }
+
+/**
+ * Call `onUpdate` once, the next time `store` changes, and stop listening.
+ * Used after a reconnect: the state on screen is from before the drop, so
+ * the signal stays dark until the host's fresh state arrives.
+ * @param {{ subscribe: (fn: (value: any) => void) => () => void }} store
+ * @param {() => void} onUpdate
+ * @returns {() => void} stops waiting
+ */
+export function onNextUpdate(store, onUpdate) {
+  let initial = true
+  let done = false
+  /** @type {(() => void) | undefined} */
+  let unsubscribe
+  unsubscribe = store.subscribe(() => {
+    // subscribe() calls back once at once with the current value; skip that
+    if (initial) return
+    if (done) return
+    done = true
+    onUpdate()
+    unsubscribe?.()
+  })
+  initial = false
+  return () => { done = true; unsubscribe?.() }
+}

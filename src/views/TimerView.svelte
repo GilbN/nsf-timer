@@ -8,6 +8,7 @@
   import { session, stopScheduler, rememberRoom, endSession } from '../lib/session.js'
   import { setSoundEnabled, beepStart, beepStop, beepTargetUp, beepTargetDown } from '../lib/audio.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
+  import { onNextUpdate } from '../lib/signal.js'
   import TimerDisplay from '../components/TimerDisplay.svelte'
   import ControlBar from '../components/ControlBar.svelte'
   import PeerList from '../components/PeerList.svelte'
@@ -26,6 +27,10 @@
   let program = $derived(getProgramById($timerState.programId))
   let hasNextStage = $derived(program && $timerState.stageIndex < program.stages.length - 1)
   let connectionStatus = $state('connected')
+  let awaitingFresh = $state(false)
+  /** @type {(() => void) | undefined} */
+  let stopWaiting
+  $effect(() => () => stopWaiting?.())
 
   // Persist timer state on changes (host only)
   $effect(() => {
@@ -68,6 +73,13 @@
     if (client) {
       client.onStatusChange((status) => {
         if (status === 'connected') {
+          // Back after a drop: what's on screen is from before it, so keep
+          // the signal dark until the host's fresh state arrives
+          if (connectionStatus !== 'connected') {
+            awaitingFresh = true
+            stopWaiting?.()
+            stopWaiting = onNextUpdate(timerState, () => { awaitingFresh = false })
+          }
           connectionStatus = 'connected'
         } else if (status === 'reconnecting') {
           connectionStatus = 'reconnecting'
@@ -227,7 +239,7 @@
   </div>
 
   <div class="body">
-    <TimerDisplay {isHost} live={!initialIsClient || connectionStatus === 'connected'} />
+    <TimerDisplay {isHost} live={!initialIsClient || (connectionStatus === 'connected' && !awaitingFresh)} />
 
     <div class="panel">
       <div class="outline-slot"><ProgramOutline /></div>
@@ -295,9 +307,10 @@
   .notice :global(svg) { width: 20px; height: 20px; flex: none; }
   .notice small { display: block; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); }
 
+  /* No min-height: 0 here. When the keys and notices don't leave the
+     display its minimum, the view scrolls instead of crushing the clock. */
   .body {
     flex: 1;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -305,6 +318,8 @@
   }
 
   .panel { flex: none; }
+  /* min-content: the display never shrinks below its text plus the digits' own minimum */
+  .body :global(.timer-display) { min-height: min-content; }
 
   .tiles {
     display: grid;
@@ -324,9 +339,11 @@
       width: clamp(240px, 36%, 320px);
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
       gap: 10px;
     }
+    /* Push the keys to the bottom with a margin, not justify-content, so
+       keys that don't fit spill downward into the scroll area, never up */
+    .panel > :global(:last-child) { margin-top: auto; }
     .tiles { height: auto; }
   }
 

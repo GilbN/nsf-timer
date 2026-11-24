@@ -2,7 +2,7 @@
   import { timerState, preferences } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
-  import { forwardOptions, upNextText, contextFor, loadingSeconds } from '../lib/timer/progress.js'
+  import { forwardOptions, upNextText, contextFor, loadingSeconds, fmtSec } from '../lib/timer/progress.js'
   import Icon from './ui/Icon.svelte'
 
   /**
@@ -42,7 +42,7 @@
   })
 
   let slot3Label = $derived(f.slot3?.kind === 'stage' ? $t('nextStageLabel') : $t('nextExerciseLabel'))
-  let loadingSuffix = $derived(exercise ? `, ${loadingSeconds(exercise)} s ${$t('metaLoading')}` : '')
+  let loadingSuffix = $derived(exercise ? `, ${fmtSec(loadingSeconds(exercise))} ${$t('metaLoading')}` : '')
 </script>
 
 <div class="keypad" data-phase={phase}>
@@ -104,22 +104,22 @@
       <!-- Restart is the only way on after stopping the last series -->
       <button class="key" class:key-white={!f.primary} onclick={onRestart}>
         <Icon name="reset" />
-        <span>{$t('restartSeries')}<small>{$t('series')} {restartNumber} {$t('again')}</small></span>
+        <span>{$t('restartSeries')}<small>{$t('series')} {restartNumber}{ts.stoppedReason ? ` ${$t('again')}` : ''}</small></span>
       </button>
     </div>
   {/if}
 
   <div class="row">
     <button class="key key-row" onclick={onReset}>
-      <Icon name="reset" />{$t('reset')}
+      <Icon name="reset" /><span class="label">{$t('reset')}</span>
     </button>
     {#if onShooters}
       <button class="key key-row" onclick={onShooters}>
-        <Icon name="users" />{$t('shooters')}<span class="count tnum">{peerCount}</span>
+        <Icon name="users" /><span class="label">{$t('shooters')}</span><span class="count tnum">{peerCount}</span>
       </button>
     {:else if onJump}
       <button class="key key-row" onclick={onJump} disabled={phase !== 'idle' && phase !== 'stopped'}>
-        <Icon name="jump" />{$t('jumpToPosition')}
+        <Icon name="jump" /><span class="label">{$t('jumpToPosition')}</span>
       </button>
     {/if}
   </div>
@@ -157,9 +157,10 @@
     gap: 10px;
   }
 
-  .row .key { min-width: 0; white-space: nowrap; overflow: hidden; }
 
-  .row .key { min-height: 60px; padding: 12px 16px; }
+  /* Labels wrap to a second line rather than being cut off; the count never shrinks */
+  .row .key { min-width: 0; min-height: 60px; padding: 12px 16px; line-height: 1.15; }
+  .row .label { min-width: 0; overflow-wrap: break-word; }
   .row .key:only-child { grid-column: span 2; }
 
   /* Landscape phones and small tablets: one column of compact keys beside
@@ -192,6 +193,7 @@
   }
 
   .count {
+    flex: none;
     margin-left: auto;
     font-size: 0.8125rem;
     font-weight: 800;

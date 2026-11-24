@@ -26,7 +26,10 @@
   --key-2: #2a2a2d;
   --key-hi: rgba(255, 255, 255, 0.07);
   --muted: #8e8e93;
-  --faint: #48484a;
+  --faint: #48484a;       /* decoration only; too dark for text */
+  --soft: #b4b4b9;        /* paused digits: between live and resting */
+  --stroke: #6e6e73;      /* outlines that must read as shapes (3:1) */
+  --stroke-faint: #3a3a3d;
   --well: #0f0f10;
   --line: #1f1f21;
   --sheet: #111113;

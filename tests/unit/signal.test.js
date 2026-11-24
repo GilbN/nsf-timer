@@ -19,3 +19,29 @@ describe('signalFor', () => {
     expect(signalFor({ phase, targetVisible })).toEqual({ lamp: 'red', lit: false })
   })
 })
+
+describe('onNextUpdate', () => {
+  it('waits for the next change, not the current value', async () => {
+    const { writable } = await import('svelte/store')
+    const { onNextUpdate } = await import('../../src/lib/signal.js')
+    const store = writable(1)
+    let calls = 0
+    onNextUpdate(store, () => { calls++ })
+    expect(calls).toBe(0)
+    store.set(2)
+    expect(calls).toBe(1)
+    store.set(3)
+    expect(calls).toBe(1)
+  })
+
+  it('can be cancelled before anything arrives', async () => {
+    const { writable } = await import('svelte/store')
+    const { onNextUpdate } = await import('../../src/lib/signal.js')
+    const store = writable(1)
+    let calls = 0
+    const stop = onNextUpdate(store, () => { calls++ })
+    stop()
+    store.set(2)
+    expect(calls).toBe(0)
+  })
+})

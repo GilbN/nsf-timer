@@ -296,7 +296,7 @@
   .editor-input::-webkit-outer-spin-button,
   .editor-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-  .colon { font-size: clamp(3rem, 16vw, 5rem); color: var(--faint); padding-bottom: 28px; }
+  .colon { font-size: clamp(3rem, 16vw, 5rem); color: var(--muted); padding-bottom: 28px; }
   .unit { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 
   .pad {
@@ -319,10 +319,10 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    height: clamp(128px, 24dvh, 190px);
+    min-height: clamp(128px, 24dvh, 190px);
   }
 
-  .pad.editing .main { height: clamp(104px, 17dvh, 150px); }
+  .pad.editing .main { min-height: clamp(104px, 17dvh, 150px); }
 
   /*
    * Landscape: the display takes the left, the keys stand in a column on

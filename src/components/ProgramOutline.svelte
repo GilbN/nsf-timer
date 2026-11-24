@@ -89,7 +89,7 @@
     flex: none;
     font-size: 0.8125rem;
     font-weight: 800;
-    box-shadow: inset 0 0 0 1.5px #3a3a3d;
+    box-shadow: inset 0 0 0 1.5px var(--stroke-faint);
     color: var(--muted);
   }
 

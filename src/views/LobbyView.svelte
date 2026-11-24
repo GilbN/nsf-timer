@@ -153,13 +153,15 @@
       justify-content: center;
       container-type: inline-size;
       min-height: 0;
+      overflow: hidden;
     }
 
     .label { font-size: 0.875rem; }
 
-    /* Four characters fill the panel width, up to a sign-sized cap */
+    /* Sized so four of the widest letters (WWWW, about 4.1em with the
+       tracking) still fit the panel, up to a sign-sized cap */
     .code {
-      font-size: min(34cqw, 10rem);
+      font-size: min(23cqw, 10rem);
       letter-spacing: 0.02em;
       line-height: 1;
     }
@@ -178,7 +180,7 @@
 
   @media (orientation: landscape) and (min-width: 640px) and (max-height: 640px) {
     .room { padding: 16px 20px; justify-content: flex-start; }
-    .code { font-size: min(34cqw, 6rem); }
+    .code { font-size: min(23cqw, 6rem); }
     .peers { font-size: 0.9375rem; margin-top: 4px; }
   }
 </style>

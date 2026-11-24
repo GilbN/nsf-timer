@@ -47,15 +47,15 @@
 </span>
 
 <style>
-  .room-code { display: inline-flex; gap: 6px; min-width: 0; }
+  .room-code { display: inline-flex; gap: 12px; min-width: 0; }
   .code { font-size: 0.9375rem; font-weight: 800; letter-spacing: 0.04em; }
   .code :global(svg) { color: var(--muted); }
   .copied { font-size: 0.75rem; font-weight: 700; color: var(--muted); letter-spacing: 0; }
   .share { width: 30px; padding: 0; justify-content: center; }
 
   /* The pills stay 30px tall but take taps across a 44px area */
-  .room-code { gap: 10px; }
   .code, .share { position: relative; }
-  .code::after, .share::after { content: ""; position: absolute; inset: -7px -5px; }
+  .code::after { content: ""; position: absolute; inset: -7px -5px; }
+  .share::after { content: ""; position: absolute; inset: -7px; }
   .share :global(svg) { color: var(--muted); }
 </style>

@@ -264,13 +264,12 @@
     <!-- Layout only: a column of its own in landscape, invisible in portrait -->
     <div class="keys-col">
       {#if connecting || error}
-        <div class="status" role={error && !connecting ? 'alert' : 'status'}>
-          {#if connecting}
-            <span class="spinner"></span>{$t('connecting')}…
-          {:else}
-            <span class="led red"></span><span class="err">{error}</span>
-          {/if}
-        </div>
+        <!-- Separate elements: screen readers ignore a role change on a live node -->
+        {#if connecting}
+          <div class="status" role="status"><span class="spinner"></span>{$t('connecting')}…</div>
+        {:else}
+          <div class="status" role="alert"><span class="led red"></span><span class="err">{error}</span></div>
+        {/if}
       {/if}
 
       <div class="pad">
@@ -387,7 +386,6 @@
         <p class="form-status" role="alert"><span class="led red"></span>{error}</p>
       {/if}
 
-      <!-- Lets Enter submit from any field -->
       <!-- Lets Enter/Go submit; not display:none, which some browsers skip -->
       <button type="submit" class="sr-only" aria-hidden="true" tabindex="-1"></button>
     </form>
@@ -609,7 +607,7 @@
       max-width: 1180px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-      grid-template-rows: auto minmax(0, 1fr) minmax(0, 680px) minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) minmax(min-content, 680px) minmax(0, 1fr);
       grid-template-areas:
         'bar bar'
         '. .'

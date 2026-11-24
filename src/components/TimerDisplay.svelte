@@ -49,7 +49,7 @@
 
   // Loading, hidden/visible or time per series, and shots, so everyone can
   // tell which exercise is next before the targets turn
-  let facts = $derived(exerciseFacts(ctx.stage, ctx.exercise, $t).join(', '))
+  let facts = $derived(exerciseFacts(ctx.stage, ctx.exercise, $t))
 
   // How bright the digits are when the display is dark
   let tone = $derived(
@@ -74,9 +74,10 @@
     <span class="digits" style="--chars: {digits.length}" aria-live="off">{digits}</span>
   </div>
 
-  {#if showing || facts}
+  {#if showing || facts.length}
     <div class="line facts">
-      <span class="sub tnum ellipsis">{facts}</span>
+      <!-- Each fact stays whole; the line wraps between them at big text sizes -->
+      <span class="sub tnum fact-list">{#each facts as fact, i (i)}<span class="fact">{fact}{i < facts.length - 1 ? ',' : ''}</span>{/each}</span>
       {#if showing}<span class="sub tnum">{showing}</span>{/if}
     </div>
   {/if}
@@ -102,7 +103,9 @@
   .stage { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { color: var(--sub); font-weight: 600; white-space: nowrap; }
   .ellipsis { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .facts { font-size: 0.8125rem; }
+  .facts { font-size: 0.8125rem; align-items: flex-start; }
+  .fact-list { display: flex; flex-wrap: wrap; column-gap: 0.3em; white-space: normal; min-width: 0; }
+  .fact { white-space: nowrap; }
   .chips { display: flex; gap: 6px; flex: none; }
 
   .chip {
@@ -120,9 +123,10 @@
   .chip.ghost { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; color: var(--sub); }
 
   /* The digits fill whatever room the display has, in any layout */
+  /* The digits always keep this much height; the display grows around it */
   .time {
     flex: 1;
-    min-height: 0;
+    min-height: clamp(96px, 20dvh, 220px);
     container-type: size;
     display: flex;
     align-items: flex-end;
@@ -135,7 +139,7 @@
   }
 
   .time[data-tone='live'] .digits { color: #e4e4e7; }
-  .time[data-tone='paused'] .digits { color: #b4b4b9; }
+  .time[data-tone='paused'] .digits { color: var(--soft); }
   .time[data-tone='rest'] .digits { color: var(--muted); }
   :global(.display.lit) .time .digits { color: var(--ink); }
 </style>

@@ -101,7 +101,7 @@
   }
 
   .jams { display: inline-flex; gap: 4px; flex: none; }
-  .jams i { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px #6e6e73; }
+  .jams i { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px var(--stroke); }
   .jams i.used { background: var(--fg); box-shadow: none; }
 
   .reshoot { height: 40px; border-radius: 12px; padding: 0 12px; }
