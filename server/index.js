@@ -272,8 +272,10 @@ function handleClose(ws) {
       console.log(`[room] closed ${code} (grace period expired)`)
     }, HOST_GRACE_PERIOD)
   } else {
+    // detach() already reset the socket's flags, so read the stored entry
+    const isSpectator = room.clients.get(peerId)?.isSpectator
     room.clients.delete(peerId)
-    if (room.host && !ws._isSpectator) {
+    if (room.host && !isSpectator) {
       send(room.host, { action: 'PEER_LEFT', peerId })
     }
     console.log(`[room] ${code} peer left: ${peerId}`)

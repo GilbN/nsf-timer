@@ -62,6 +62,14 @@ describe('relay server — message fan-out', () => {
       await host.ws.close()
     })
 
+    it('does not tell the host when a spectator leaves', async () => {
+      const host = await createHost(server.url)
+      const display = await joinClient(server.url, host.code, { role: 'spectator' })
+      await display.ws.close()
+      await expect(host.ws.next(200)).rejects.toThrow(/Timed out/)
+      await host.ws.close()
+    })
+
     it('does not cache non-STATE_SYNC messages', async () => {
       const host = await createHost(server.url)
       host.ws.send({ action: 'RELAY', message: { type: 'BEEP', payload: {}, ts: 1 } })

@@ -3,6 +3,7 @@ import { SocketHost } from './peer/SocketHost.js'
 import { SocketClient } from './peer/SocketClient.js'
 import { TimerScheduler } from './timer/TimerScheduler.js'
 import { currentView, roomState } from './stores.js'
+import { confirmRequest } from './confirm.js'
 import { addRoomToHistory, clearRoomState, clearTimerState, loadRoomState, saveRoomState } from './storage.js'
 
 /**
@@ -31,6 +32,12 @@ export async function hostRoom(code = null, hostToken = null) {
   // home. The saved session now belongs to the new host, so leave it alone.
   host.onReplaced(() => {
     if (session.host !== host) return
+    // A confirm left open here (Disconnect, Reset...) would act on the room
+    // the new host now owns. Answer it with Cancel.
+    confirmRequest.update((pending) => {
+      pending?.resolve(false)
+      return null
+    })
     stopScheduler()
     session.host = null
     roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })

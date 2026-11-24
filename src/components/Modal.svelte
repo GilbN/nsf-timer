@@ -9,32 +9,46 @@
   /** @type {HTMLDialogElement | undefined} */
   let dialog = $state()
 
+  // Set when the parent removes the modal. Closing the dialog then queues a
+  // 'close' event that must not reach onClose, or it could answer whatever
+  // the parent shows next.
+  let unmounted = false
+
   $effect(() => {
     if (!dialog) return
     const el = dialog
     if (!el.open) el.showModal()
     return () => {
+      unmounted = true
       if (el.open) el.close()
     }
   })
 
-  // The browser sends clicks on ::backdrop to the <dialog> itself. Only close
-  // when the press also started there, so a drag out of the panel doesn't.
+  // The browser sends clicks on ::backdrop to the <dialog> itself, and a
+  // drag between the panel and the backdrop also lands there. Only close
+  // when both the press and the release were on the backdrop.
   let pressedOnBackdrop = false
+  let releasedOnBackdrop = false
 
   /** @param {PointerEvent} e */
   function onPointerDown(e) {
     pressedOnBackdrop = e.target === dialog
   }
 
+  /** @param {PointerEvent} e */
+  function onPointerUp(e) {
+    releasedOnBackdrop = e.target === dialog
+  }
+
   /** @param {MouseEvent} e */
   function onBackdropClick(e) {
-    if (pressedOnBackdrop && e.target === dialog) dialog?.close()
+    if (pressedOnBackdrop && releasedOnBackdrop && e.target === dialog) dialog?.close()
     pressedOnBackdrop = false
+    releasedOnBackdrop = false
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby={labelledby} onclose={() => onClose?.()} onpointerdown={onPointerDown} onclick={onBackdropClick}>
+<dialog bind:this={dialog} aria-labelledby={labelledby} onclose={() => { if (!unmounted) onClose?.() }} onpointerdown={onPointerDown} onpointerup={onPointerUp} onclick={onBackdropClick}>
   {@render children()}
 </dialog>
 
