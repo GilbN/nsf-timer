@@ -870,5 +870,20 @@ describe('TimerScheduler', () => {
       expect(scheduler.state.stoppedReason).toBe('seriesComplete')
       expect(scheduler.state.isReshoot).toBe(false)
     })
+
+    it('keeps Restart available after stopping a reshoot of the last series', () => {
+      scheduler.loadProgram('standard')
+      const last = scheduler.program.stages.length - 1
+      const exercises = scheduler.program.stages[last].exercises
+      const lastEx = exercises.length - 1
+      scheduler.jumpTo(last, lastEx, exercises[lastEx].seriesCount - 1)
+      scheduler._seriesComplete()
+      expect(scheduler.state.stoppedReason).toBe('programComplete')
+
+      scheduler.startReshoot('Ola')
+      scheduler.stop()
+      expect(scheduler.state.stoppedReason).toBe('aborted')
+      expect(scheduler.state.seriesIndex).toBe(exercises[lastEx].seriesCount - 1)
+    })
   })
 })

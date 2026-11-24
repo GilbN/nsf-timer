@@ -18,11 +18,14 @@ function remainingFromSaved(saved) {
  * Why a series counts as stopped when it is cut short. An interrupted
  * reshoot goes back to the result from before the reshoot. seriesIndex
  * already points past the reshot series, so 'aborted' would make Next
- * series skip one.
+ * series skip one. A reshoot of the program's last series is the
+ * exception. 'programComplete' hides Restart, and the host should still
+ * be able to rerun the reshoot they stopped.
  */
 export function interruptedReason(state) {
-  if (state.isReshoot) return state.preReshootStoppedReason ?? 'aborted'
-  return 'aborted'
+  if (!state.isReshoot) return 'aborted'
+  const before = state.preReshootStoppedReason
+  return before && before !== 'programComplete' ? before : 'aborted'
 }
 
 /**
