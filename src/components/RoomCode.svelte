@@ -37,8 +37,10 @@
   <button class="pill code" onclick={copyCode} aria-label="{$t('copy')} {code}" title={$t('copy')}>
     <span class="tnum">{code}</span>
     <Icon name={copied ? 'check' : 'copy'} />
-    {#if copied}<span class="copied" role="status">{$t('copied')}</span>{/if}
   </button>
+  <!-- The checkmark is the visible feedback; this tells screen readers
+       without widening the pill into the share button -->
+  <span class="sr-only" role="status">{copied ? $t('copied') : ''}</span>
   {#if canShare}
     <button class="pill share" onclick={shareCode} aria-label={$t('share')} title={$t('share')}>
       <Icon name="share" />
@@ -50,7 +52,6 @@
   .room-code { display: inline-flex; gap: 12px; min-width: 0; }
   .code { font-size: 0.9375rem; font-weight: 800; letter-spacing: 0.04em; }
   .code :global(svg) { color: var(--muted); }
-  .copied { font-size: 0.75rem; font-weight: 700; color: var(--muted); letter-spacing: 0; }
   .share { width: 30px; flex: none; padding: 0; justify-content: center; }
 
   /* The pills stay 30px tall but take taps across a 44px area */

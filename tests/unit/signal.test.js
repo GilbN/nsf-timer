@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { signalFor } from '../../src/lib/signal.js'
+import { signalFor, mayBeStaleSignal } from '../../src/lib/signal.js'
 
 describe('signalFor', () => {
   it('keeps the lamp off and the display dark while idle', () => {
@@ -21,15 +21,13 @@ describe('signalFor', () => {
 })
 
 describe('mayBeStaleSignal', () => {
-  it('flags a series in progress', async () => {
-    const { mayBeStaleSignal } = await import('../../src/lib/signal.js')
+  it('flags a series in progress', () => {
     expect(mayBeStaleSignal({ programId: 'standard', phase: 'shooting' })).toBe(true)
     expect(mayBeStaleSignal({ programId: 'standard', phase: 'loading' })).toBe(true)
     expect(mayBeStaleSignal({ programId: 'standard', phase: 'paused' })).toBe(true)
   })
 
-  it('leaves the lobby and a resting program alone', async () => {
-    const { mayBeStaleSignal } = await import('../../src/lib/signal.js')
+  it('leaves the lobby and a resting program alone', () => {
     expect(mayBeStaleSignal({ programId: null, phase: 'idle' })).toBe(false)
     expect(mayBeStaleSignal({ programId: 'standard', phase: 'idle' })).toBe(false)
     expect(mayBeStaleSignal({ programId: 'standard', phase: 'stopped' })).toBe(false)

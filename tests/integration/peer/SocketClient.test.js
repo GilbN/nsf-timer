@@ -207,9 +207,13 @@ describe('SocketClient — receiving RELAY messages', () => {
     await new Promise(r => setTimeout(r, 50))
 
     const client = new SocketClient()
+    let snapshots = 0
+    client.onSnapshot(() => { snapshots++ })
     await client.joinRoom(host.code, { name: 'Late', lane: '1' })
 
     await vi.waitFor(() => expect(get(timerState)).toMatchObject(state))
+    // The cached copy counts as a snapshot: a rejoining view can trust it
+    expect(snapshots).toBe(1)
 
     client.destroy()
     await host.ws.close()

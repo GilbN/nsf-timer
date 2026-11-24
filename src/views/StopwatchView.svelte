@@ -258,7 +258,7 @@
   }
 
   .time:disabled { cursor: default; }
-  .time.running { color: #e4e4e7; }
+  .time.running { color: var(--live); }
   .time.paused { color: var(--muted); }
   .time.editable { color: var(--fg); }
 
@@ -282,7 +282,8 @@
 
   .editor-input {
     width: 2.4ch;
-    font-size: clamp(4rem, 22vw, 7rem);
+    /* Capped by the screen width too, so both fields fit at the largest text size */
+    font-size: min(clamp(4rem, 22vw, 7rem), 22vw);
     background: none;
     border: 0;
     border-bottom: 3px solid var(--key-2);

@@ -17,7 +17,6 @@ export function signalFor(state) {
   return { lamp: 'red', lit: false }
 }
 
-
 /**
  * Whether a state left on screen across a connection drop could show a
  * live signal that is no longer true. Only a series in progress can:

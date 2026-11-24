@@ -154,9 +154,7 @@
       padding: 26px 26px 24px;
       gap: 6px;
       justify-content: center;
-      container-type: inline-size;
       min-height: 0;
-      overflow: hidden;
     }
 
     .label { font-size: 0.875rem; }
