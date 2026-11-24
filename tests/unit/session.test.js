@@ -5,7 +5,24 @@ vi.mock('../../src/lib/audio.js', () => ({
   unlockAudio: vi.fn(), setSoundEnabled: vi.fn(),
 }))
 
-const { session, startScheduler, stopScheduler } = await import('../../src/lib/session.js')
+// A stand-in SocketHost that lets the test fire the relay's 4001 replacement
+const fakeHosts = []
+vi.mock('../../src/lib/peer/SocketHost.js', () => ({
+  SocketHost: class {
+    constructor() { this.code = null; this.hostToken = null; fakeHosts.push(this) }
+    onHostToken(cb) { this.tokenCb = cb }
+    onReplaced(cb) { this.replacedCb = cb }
+    async createRoom(code) { this.code = code || 'ABCD'; this.hostToken = 'token'; return this.code }
+    broadcastState() {}
+    broadcastTick() {}
+    destroy() {}
+  },
+}))
+
+const { session, startScheduler, stopScheduler, hostRoom } = await import('../../src/lib/session.js')
+const { confirmAction, confirmRequest } = await import('../../src/lib/confirm.js')
+const { currentView } = await import('../../src/lib/stores.js')
+const { get } = await import('svelte/store')
 
 describe('startScheduler', () => {
   afterEach(() => {
@@ -31,3 +48,22 @@ describe('startScheduler', () => {
     expect(sent.map((s) => s.phase)).toEqual(['idle'])
   })
 })
+
+describe('hostRoom replacement', () => {
+  it('cancels an open confirm and goes home when another tab takes the room', async () => {
+    const host = await hostRoom()
+    startScheduler('standard')
+    currentView.set('timer')
+    const answer = confirmAction('Disconnect?', 'Disconnect')
+
+    fakeHosts.at(-1).replacedCb()
+
+    await expect(answer).resolves.toBe(false)
+    expect(get(confirmRequest)).toBeNull()
+    expect(session.host).toBeNull()
+    expect(session.scheduler).toBeNull()
+    expect(get(currentView)).toBe('home')
+    expect(host).toBe(fakeHosts.at(-1))
+  })
+})
+

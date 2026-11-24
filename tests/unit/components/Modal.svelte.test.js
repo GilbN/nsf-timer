@@ -1,22 +1,26 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mount, unmount, flushSync } from 'svelte'
 import ModalHost from './ModalHost.svelte'
 
 // Browsers fire a dialog's 'close' event in a later task, not inside close().
 const realDispatch = HTMLElement.prototype.dispatchEvent
 const deferred = new WeakSet()
-HTMLElement.prototype.dispatchEvent = function (event) {
-  if (this instanceof HTMLDialogElement && event.type === 'close' && !deferred.has(event)) {
-    deferred.add(event)
-    setTimeout(() => this.dispatchEvent(event))
-    return true
+function deferDialogClose() {
+  HTMLElement.prototype.dispatchEvent = function (event) {
+    if (this instanceof HTMLDialogElement && event.type === 'close' && !deferred.has(event)) {
+      deferred.add(event)
+      setTimeout(() => this.dispatchEvent(event))
+      return true
+    }
+    return realDispatch.call(this, event)
   }
-  return realDispatch.call(this, event)
 }
 
 describe('Modal', () => {
   let app
+  beforeEach(deferDialogClose)
   afterEach(() => {
+    HTMLElement.prototype.dispatchEvent = realDispatch
     if (app) unmount(app)
     app = null
     document.body.innerHTML = ''
