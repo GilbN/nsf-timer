@@ -3,6 +3,7 @@
   import { timerState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
   import Modal from './Modal.svelte'
+  import Icon from './ui/Icon.svelte'
 
   let visible = $derived($updateAvailable && !$updateDismissed)
   let matchInProgress = $derived(
@@ -19,103 +20,45 @@
 </script>
 
 {#if visible}
-  <Modal onClose={dismiss} labelledby="update-modal-title">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <h2 id="update-modal-title" class="modal-title">{$t('updateAvailable')}</h2>
+  <Modal variant="sheet" onClose={dismiss} labelledby="update-modal-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 id="update-modal-title">{$t('updateAvailable')}</h2>
       </div>
 
-      <p class="modal-body">{$t('updateAvailableBody')}</p>
+      <p class="body">{$t('updateAvailableBody')}</p>
 
       {#if matchInProgress}
-        <p class="modal-warning">{$t('reloadDuringMatchWarning')}</p>
+        <p class="warning well">{$t('reloadDuringMatchWarning')}</p>
       {/if}
 
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick={dismiss}>{$t('later')}</button>
-        <button class="btn-primary" onclick={reload}>{$t('reloadNow')}</button>
+      <div class="key-grid foot">
+        <button class="key" onclick={dismiss}>
+          <Icon name="x" /><span>{$t('later')}</span>
+        </button>
+        <button class="key key-white" onclick={reload}>
+          <Icon name="download" /><span>{$t('reloadNow')}</span>
+        </button>
       </div>
     </div>
   </Modal>
 {/if}
 
 <style>
-  .modal-panel {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-lg, var(--radius));
-    padding: 1.25rem;
-    width: min(90vw, 420px);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+  .body {
+    padding: 0 4px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--muted);
   }
 
-  .modal-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .modal-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-    letter-spacing: 0.04em;
-  }
-
-  .modal-body {
-    margin: 0;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
+  .warning {
+    padding: 14px 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
     line-height: 1.45;
   }
 
-  .modal-warning {
-    margin: 0;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.82rem;
-    color: var(--warning);
-    background: rgba(255, 181, 71, 0.12);
-    border: 1px solid rgba(255, 181, 71, 0.3);
-    border-radius: var(--radius);
-    line-height: 1.4;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    background: var(--accent);
-    color: var(--bg-primary);
-    border: none;
-    border-radius: var(--radius);
-    letter-spacing: 0.04em;
-  }
-
-  .btn-primary:hover {
-    filter: brightness(1.1);
-  }
-
-  .btn-secondary {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    background: var(--bg-surface);
-    color: var(--text-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius);
-  }
-
-  .btn-secondary:hover {
-    color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
+  .foot .key { min-height: 96px; }
 </style>

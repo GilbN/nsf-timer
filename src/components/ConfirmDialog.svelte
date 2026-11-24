@@ -2,6 +2,7 @@
   import { confirmRequest } from '../lib/confirm.js'
   import { t } from '../lib/i18n.js'
   import Modal from './Modal.svelte'
+  import Icon from './ui/Icon.svelte'
 
   /**
    * @param {boolean} ok
@@ -19,15 +20,17 @@
 {#if $confirmRequest}
   {@const request = $confirmRequest}
   {#key request}
-    <Modal onClose={() => answer(false, request)} labelledby="confirm-dialog-message">
-      <div class="modal-panel">
-        <p id="confirm-dialog-message" class="modal-body">{request.message}</p>
-        <div class="modal-actions">
+    <Modal variant="sheet" onClose={() => answer(false, request)} labelledby="confirm-dialog-message">
+      <div class="sheet-panel">
+        <p id="confirm-dialog-message" class="message">{request.message}</p>
+        <div class="key-grid">
           <!-- Every confirm guards a destructive action, so Enter means Cancel -->
           <!-- svelte-ignore a11y_autofocus -->
-          <button class="btn-secondary" autofocus onclick={() => answer(false, request)}>{$t('cancel')}</button>
-          <button class="btn-primary" onclick={() => answer(true, request)}>
-            {request.confirmLabel ?? 'OK'}
+          <button class="key" autofocus onclick={() => answer(false, request)}>
+            <Icon name="x" /><span>{$t('cancel')}</span>
+          </button>
+          <button class="key key-white" onclick={() => answer(true, request)}>
+            <Icon name="check" /><span>{request.confirmLabel ?? 'OK'}</span>
           </button>
         </div>
       </div>
@@ -36,57 +39,13 @@
 {/if}
 
 <style>
-  .modal-panel {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-lg, var(--radius));
-    padding: 1.25rem;
-    width: min(90vw, 380px);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .modal-body {
-    margin: 0;
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    line-height: 1.45;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+  .message {
+    padding: 4px 4px 2px;
+    font-size: 1.125rem;
     font-weight: 700;
-    background: var(--accent);
-    color: var(--bg-primary);
-    border: none;
-    border-radius: var(--radius);
-    letter-spacing: 0.04em;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
   }
 
-  .btn-primary:hover {
-    filter: brightness(1.1);
-  }
-
-  .btn-secondary {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    background: var(--bg-surface);
-    color: var(--text-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius);
-  }
-
-  .btn-secondary:hover {
-    color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
+  .key { min-height: 104px; }
 </style>

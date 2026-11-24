@@ -5,324 +5,267 @@
   import { confirmAction } from '../lib/confirm.js'
   import { getAllPrograms } from '../lib/programs/registry.js'
   import { loadCustomPrograms, deleteCustomProgram } from '../lib/storage.js'
+  import Modal from './Modal.svelte'
+  import Icon from './ui/Icon.svelte'
 
   let { onSelect, onCustom, onEdit } = $props()
 
   let builtinPrograms = getAllPrograms()
   let customPrograms = $state(loadCustomPrograms())
   let lang = $derived($preferences.lang)
-  let expandedId = $state(null)
 
-  function toggleInfo(e, id) {
+  /**
+   * The program whose details sheet is open, built-in or custom.
+   * @type {any}
+   */
+  let sheetProgram = $state(null)
+  let sheetIsCustom = $derived(!!sheetProgram && customPrograms.some((p) => p.id === sheetProgram?.id))
+
+  function openSheet(e, program) {
     e.stopPropagation()
-    expandedId = expandedId === id ? null : id
+    sheetProgram = program
+  }
+
+  function closeSheet() {
+    sheetProgram = null
+  }
+
+  function startFromSheet() {
+    const id = sheetProgram?.id
+    sheetProgram = null
+    if (id) onSelect(id)
   }
 
   function handleEdit(e, program) {
     e.stopPropagation()
+    sheetProgram = null
     if (onEdit) onEdit(program)
   }
 
   async function handleDelete(e, program) {
     e.stopPropagation()
+    sheetProgram = null
     if (!(await confirmAction(get(t)('confirmDeleteProgram'), get(t)('deleteProgram')))) return
     deleteCustomProgram(program.id)
     customPrograms = loadCustomPrograms()
   }
+
+  /** "25m, 60 skudd" */
+  function metaFor(program) {
+    const shots = `${program.totalCompetitionShots} ${$t('shotsShort')}`
+    return program.distance ? `${program.distance}, ${shots}` : shots
+  }
+
+  function stagesOf(program) {
+    return program.stages.map((s) => getLocalizedName(s.name, lang)).filter(Boolean)
+  }
 </script>
 
 <div class="program-picker">
-  <p class="section-label">{$t('selectProgram')}</p>
+  <h2 class="heading">{$t('selectProgram')}</h2>
 
-  <div class="program-list">
+  <div class="grid">
     {#each builtinPrograms as program (program.id)}
-      <div class="program-entry" class:expanded={expandedId === program.id}>
-        <div class="program-row">
-          <button class="program-select" onclick={() => onSelect(program.id)}>
-            <span class="program-name">{getLocalizedName(program.name, lang)}</span>
-            <span class="program-meta">{program.distance} · {program.totalCompetitionShots} {lang === 'no' ? 'skudd' : 'shots'}</span>
-          </button>
-          <button
-            class="info-btn"
-            class:active={expandedId === program.id}
-            onclick={(e) => toggleInfo(e, program.id)}
-            aria-label={$t('programInfo')}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </button>
-        </div>
-
-        {#if expandedId === program.id}
-          <div class="info-panel">
-            <div class="info-row">
-              <span class="info-label">{$t('distance')}</span>
-              <span class="info-value">{program.distance}</span>
-            </div>
-            {#if program.calibers?.length}
-              <div class="info-row">
-                <span class="info-label">{$t('caliber')}</span>
-                <span class="info-value">{program.calibers.join(', ')}</span>
-              </div>
-            {/if}
-            {#if program.startPosition}
-              <div class="info-row">
-                <span class="info-label">{$t('startPosition')}</span>
-                <span class="info-value">{getLocalizedName(program.startPosition, lang)}</span>
-              </div>
-            {/if}
-            <div class="info-row">
-              <span class="info-label">{$t('competitionShots')}</span>
-              <span class="info-value">{program.totalCompetitionShots}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">{$t('practiceShots')}</span>
-              <span class="info-value">{program.trialShots}</span>
-            </div>
-            {#if program.weaponGroups}
-              <div class="info-row info-row-groups">
-                <span class="info-label">{$t('weaponGroups')}</span>
-                <ul class="weapon-group-list">
-                  {#each (program.weaponGroups[lang] || program.weaponGroups.no) as group (group)}
-                    <li>{group}</li>
-                  {/each}
-                </ul>
-              </div>
-            {/if}
-          </div>
-        {/if}
+      <div class="slot">
+        <button class="key program" onclick={() => onSelect(program.id)}>
+          <span class="name">{getLocalizedName(program.name, lang)}</span>
+          <small>{metaFor(program)}</small>
+        </button>
+        <button
+          class="corner"
+          onclick={(e) => openSheet(e, program)}
+          aria-label="{$t('programInfo')}: {getLocalizedName(program.name, lang)}"
+        >
+          <Icon name="info" />
+        </button>
       </div>
     {/each}
 
     {#each customPrograms as program (program.id)}
-      <div class="program-entry">
-        <div class="program-row">
-          <button class="program-select" onclick={() => onSelect(program.id)}>
-            <span class="program-name">{getLocalizedName(program.name, lang)}</span>
-            <span class="program-meta">{$t('customProgram')}</span>
-          </button>
-          <button
-            class="action-btn"
-            onclick={(e) => handleEdit(e, program)}
-            aria-label={$t('editProgram')}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <button
-            class="action-btn action-btn-danger"
-            onclick={(e) => handleDelete(e, program)}
-            aria-label={$t('deleteProgram')}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-          </button>
-        </div>
+      <div class="slot">
+        <button class="key key-line program" onclick={() => onSelect(program.id)}>
+          <span class="name">{getLocalizedName(program.name, lang)}</span>
+          <small>{$t('customProgram')}</small>
+        </button>
+        <button
+          class="corner"
+          onclick={(e) => openSheet(e, program)}
+          aria-label="{$t('editProgram')}: {getLocalizedName(program.name, lang)}"
+        >
+          <Icon name="more" />
+        </button>
       </div>
     {/each}
-  </div>
 
-  {#if onCustom}
-    <button class="btn-secondary add-custom" onclick={onCustom}>
-      + {$t('customProgram')}
-    </button>
-  {/if}
+    {#if onCustom}
+      <button class="key key-line key-row add" onclick={onCustom}>
+        <Icon name="plus" />{$t('customProgram')}
+      </button>
+    {/if}
+  </div>
 </div>
 
+{#if sheetProgram}
+  {@const program = sheetProgram}
+  <Modal variant="sheet" onClose={closeSheet} labelledby="program-sheet-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 id="program-sheet-title">{getLocalizedName(program.name, lang)}</h2>
+        <span class="aside">{sheetIsCustom ? $t('customProgram') : program.distance}</span>
+      </div>
+
+      {#if sheetIsCustom}
+        <div class="stages">
+          {#each stagesOf(program) as stage, i (i)}
+            <span class="pill">{stage}</span>
+          {/each}
+        </div>
+        <div class="key-grid actions">
+          <button class="key key-white span-2" onclick={startFromSheet}>
+            <Icon name="play" filled />
+            <span>{$t('start')}<small>{getLocalizedName(program.name, lang)}</small></span>
+          </button>
+          <button class="key key-row" onclick={(e) => handleEdit(e, program)}>
+            <Icon name="edit" />{$t('editProgram')}
+          </button>
+          <button class="key key-row" onclick={(e) => handleDelete(e, program)}>
+            <Icon name="trash" />{$t('deleteProgram')}
+          </button>
+        </div>
+      {:else}
+        <div class="facts">
+          <div class="tile"><small>{$t('competitionShots')}</small><b class="tnum">{program.totalCompetitionShots}</b></div>
+          <div class="tile"><small>{$t('practiceShots')}</small><b class="tnum">{program.trialShots}</b></div>
+        </div>
+
+        <dl class="rows">
+          {#if program.calibers?.length}
+            <div><dt>{$t('caliber')}</dt><dd>{program.calibers.join(', ')}</dd></div>
+          {/if}
+          {#if program.startPosition}
+            <div><dt>{$t('startPosition')}</dt><dd>{getLocalizedName(program.startPosition, lang)}</dd></div>
+          {/if}
+          {#if program.weaponGroups}
+            <div>
+              <dt>{$t('weaponGroups')}</dt>
+              <dd>
+                <ul>
+                  {#each (program.weaponGroups[lang] || program.weaponGroups.no) as group (group)}
+                    <li>{group}</li>
+                  {/each}
+                </ul>
+              </dd>
+            </div>
+          {/if}
+          <div>
+            <dt>{$t('stage')}</dt>
+            <dd class="stages">
+              {#each stagesOf(program) as stage, i (i)}
+                <span class="pill">{stage}</span>
+              {/each}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="key-grid actions">
+          <button class="key key-white" onclick={startFromSheet}>
+            <Icon name="play" filled />
+            <span>{$t('start')}<small>{getLocalizedName(program.name, lang)}</small></span>
+          </button>
+          <button class="key" onclick={closeSheet}>
+            <Icon name="arrow-left" />
+            <span>{$t('back')}</span>
+          </button>
+        </div>
+      {/if}
+    </div>
+  </Modal>
+{/if}
+
 <style>
-  .program-picker {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .section-label {
-    font-size: 0.65rem;
+  .heading {
+    font-size: 0.8125rem;
     font-weight: 700;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    padding-left: 0.25rem;
+    color: var(--muted);
+    margin: 0 4px 10px;
   }
 
-  .program-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
-  .program-entry {
-    border-left: 2px solid transparent;
-    border-radius: 0 var(--radius) var(--radius) 0;
-    background: var(--bg-secondary);
-    transition: border-color 0.15s;
-    overflow: hidden;
+  .slot { position: relative; min-width: 0; }
+
+  .program {
+    width: 100%;
+    height: 112px;
+    justify-content: flex-end;
   }
 
-  .program-entry:hover,
-  .program-entry.expanded {
-    border-left-color: var(--accent);
+  .name {
+    font-size: 1.0625rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
-  .program-row {
-    display: flex;
-    align-items: center;
-    gap: 0;
-  }
+  .program small { margin-top: 0; }
 
-  .program-select {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.15rem;
-    padding: 0.7rem 0.5rem 0.7rem 0.85rem;
-    background: transparent;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    min-width: 0;
-  }
-
-  .program-name {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  .program-meta {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-  }
-
-  .info-btn {
-    flex-shrink: 0;
+  .corner {
+    position: absolute;
+    top: 6px;
+    right: 6px;
     width: 40px;
     height: 40px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: var(--text-secondary);
-    opacity: 0.5;
-    cursor: pointer;
-    transition: opacity 0.15s, color 0.15s;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
   }
 
-  .info-btn svg {
-    width: 16px;
-    height: 16px;
+  .corner :global(svg) { width: 20px; height: 20px; }
+  .corner:active { background: var(--key-2); color: var(--fg); }
+
+  .add {
+    grid-column: span 2;
+    min-height: 60px;
+    color: var(--muted);
   }
 
-  .info-btn:hover,
-  .info-btn.active {
-    opacity: 1;
-    color: var(--accent);
+  /* ── Sheet ── */
+  .facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 
-  .info-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    padding: 0 0.85rem 0.75rem 0.85rem;
-    border-top: 1px solid rgba(255,255,255,0.04);
-  }
-
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-  }
-
-  .info-row-groups {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .info-label {
-    color: var(--text-secondary);
-    flex-shrink: 0;
-  }
-
-  .info-value {
-    color: var(--text-primary);
-    font-weight: 600;
-    text-align: right;
-  }
-
-  .weapon-group-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  .rows {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    padding: 0 4px;
   }
 
-  .weapon-group-list li {
-    font-size: 0.72rem;
-    color: var(--text-primary);
-    padding-left: 0.75rem;
-    position: relative;
+  .rows > div {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.875rem;
   }
 
-  .weapon-group-list li::before {
-    content: '—';
-    position: absolute;
-    left: 0;
-    color: var(--accent);
-    font-size: 0.65rem;
-  }
+  dt { color: var(--muted); font-weight: 700; }
+  dd { font-weight: 600; }
+  dd ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
 
-  .action-btn {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: var(--text-secondary);
-    border: none;
-    opacity: 0.5;
-    cursor: pointer;
-    transition: opacity 0.15s, color 0.15s;
-  }
+  .stages { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stages .pill { height: 26px; font-size: 0.75rem; }
 
-  .action-btn svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .action-btn:hover {
-    opacity: 1;
-    color: var(--accent);
-  }
-
-  .action-btn-danger:hover {
-    color: var(--danger);
-  }
-
-  .add-custom {
-    align-self: flex-start;
-    margin-top: 0.25rem;
-    font-size: 0.85rem;
-    padding: 0.5rem 1rem;
-  }
+  .actions { margin-top: 4px; }
+  .actions .key { min-height: 96px; }
+  .actions .key-row { min-height: 60px; }
 </style>

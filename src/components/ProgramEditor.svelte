@@ -1,12 +1,13 @@
 <script>
   import { t } from '../lib/i18n.js'
   import { saveCustomPrograms, loadCustomPrograms, updateCustomProgram } from '../lib/storage.js'
+  import Icon from './ui/Icon.svelte'
 
   let { onSave, onCancel, editProgram = null } = $props()
 
   // Initial state is seeded from editProgram at mount time. The component is
   // re-mounted whenever the editor opens (via {#if showEditor} in LobbyView),
-  // so capturing the initial prop value is exactly the intended behavior —
+  // so capturing the initial prop value is exactly the intended behavior:
   // the user's subsequent edits to `name`/`stages` must not be overwritten
   // by prop reactivity.
   /* svelte-ignore state_referenced_locally */
@@ -77,7 +78,43 @@
     stages = [...stages]
   }
 
+  // Set on the first save attempt so an empty name gets marked
+  let triedSave = $state(false)
+
+  const TYPES = ['precision', 'rapid', 'duell']
+
+  /** Number fields per stage type, in the order the phases run. */
+  function fieldsFor(type) {
+    const common = [
+      { key: 'seriesCount', label: 'seriesCount', min: 1, max: 20, step: 1 },
+      { key: 'shotsPerSeries', label: 'shotsPerSeries', min: 1, max: 10, step: 1 },
+      { key: 'loadingTime', label: 'loadingTimeSec', min: 0, max: 300, step: 5 },
+    ]
+    if (type === 'duell') {
+      return [
+        ...common,
+        { key: 'targetHiddenTime', label: 'targetHiddenSec', min: 1, max: 30, step: 1 },
+        { key: 'targetVisibleTime', label: 'targetVisibleSec', min: 1, max: 30, step: 1 },
+        { key: 'shotsPerShowing', label: 'shotsPerShowing', min: 1, max: 5, step: 1 },
+      ]
+    }
+    if (type === 'rapid') {
+      return [
+        ...common,
+        { key: 'targetHiddenTime', label: 'targetHiddenSec', min: 1, max: 30, step: 1 },
+        { key: 'timePerSeries', label: 'timePerSeriesSec', min: 1, max: 600, step: 1 },
+      ]
+    }
+    return [...common, { key: 'timePerSeries', label: 'timePerSeriesSec', min: 1, max: 600, step: 5 }]
+  }
+
+  function nudge(ex, field, dir) {
+    const current = Number(ex[field.key]) || 0
+    ex[field.key] = Math.min(field.max, Math.max(field.min, current + dir * field.step))
+  }
+
   function save() {
+    triedSave = true
     if (!name.trim()) return
 
     const program = {
@@ -109,98 +146,102 @@
 </script>
 
 <div class="program-editor">
-  <h3>{editProgram ? $t('editProgram') : $t('customProgram')}</h3>
+  <div class="head">
+    <h2>{editProgram ? $t('editProgram') : $t('customProgram')}</h2>
+  </div>
 
-  <label>
-    <span>{$t('programName')}</span>
-    <input type="text" bind:value={name} placeholder={$t('programName')} />
+  <label class="block">
+    <span class="field-label">{$t('programName')}</span>
+    <input
+      class="input"
+      type="text"
+      bind:value={name}
+      placeholder={$t('programName')}
+      aria-invalid={triedSave && !name.trim() ? 'true' : undefined}
+    />
   </label>
 
   {#each stages as ds, dsIdx (dsIdx)}
-    <div class="stage-block">
-      <div class="stage-header">
-        <input type="text" bind:value={ds.name.no} placeholder={$t('stageName')} />
-        <select value={ds.type} onchange={(e) => updateType(dsIdx, e.currentTarget.value)}>
-          <option value="precision">{$t('precision')}</option>
-          <option value="rapid">{$t('rapid')}</option>
-          <option value="duell">{$t('duell')}</option>
-        </select>
+    <section class="stage well" aria-label="{$t('stage')} {dsIdx + 1}">
+      <div class="stage-head">
+        <span class="stage-no tnum">{$t('stage')} {dsIdx + 1}</span>
         {#if stages.length > 1}
-          <button class="btn-danger btn-sm" onclick={() => removeStage(dsIdx)}>X</button>
+          <button class="btn btn-ghost btn-icon" onclick={() => removeStage(dsIdx)} aria-label="{$t('removeStage')} {dsIdx + 1}">
+            <Icon name="trash" />
+          </button>
         {/if}
       </div>
 
-      {#each ds.exercises as ex, exIdx (exIdx)}
-        <div class="exercise-block">
-          {#if ds.exercises.length > 1}
-            <button
-              class="btn-remove-exercise"
-              onclick={() => removeExercise(dsIdx, exIdx)}
-              title={$t('removeExercise')}
-              aria-label={$t('removeExercise')}
-            >X</button>
-          {/if}
-          <div class="field-row">
-            <label>
-              <span>{$t('seriesCount')}</span>
-              <input type="number" bind:value={ex.seriesCount} min="1" max="20" />
-            </label>
-            <label>
-              <span>{$t('shotsPerSeries')}</span>
-              <input type="number" bind:value={ex.shotsPerSeries} min="1" max="10" />
-            </label>
-            <label>
-              <span>{$t('loadingTimeSec')}</span>
-              <input type="number" bind:value={ex.loadingTime} min="0" max="300" />
-            </label>
-          </div>
+      <input class="input" type="text" bind:value={ds.name.no} placeholder={$t('stageName')} aria-label={$t('stageName')} />
 
-          {#if ds.type === 'precision'}
-            <label>
-              <span>{$t('timePerSeriesSec')}</span>
-              <input type="number" bind:value={ex.timePerSeries} min="1" max="600" />
-            </label>
-          {:else if ds.type === 'rapid'}
-            <div class="field-row">
-              <label>
-                <span>{$t('timePerSeriesSec')}</span>
-                <input type="number" bind:value={ex.timePerSeries} min="1" max="600" />
-              </label>
-              <label>
-                <span>{$t('targetHiddenSec')}</span>
-                <input type="number" bind:value={ex.targetHiddenTime} min="1" max="30" />
-              </label>
-            </div>
-          {:else}
-            <div class="field-row">
-              <label>
-                <span>{$t('targetVisibleSec')}</span>
-                <input type="number" bind:value={ex.targetVisibleTime} min="1" max="30" />
-              </label>
-              <label>
-                <span>{$t('targetHiddenSec')}</span>
-                <input type="number" bind:value={ex.targetHiddenTime} min="1" max="30" />
-              </label>
-              <label>
-                <span>{$t('shotsPerShowing')}</span>
-                <input type="number" bind:value={ex.shotsPerShowing} min="1" max="5" />
-              </label>
+      <div class="types" role="radiogroup" aria-label="{$t('stage')} {dsIdx + 1}">
+        {#each TYPES as type (type)}
+          <button
+            class="type"
+            class:on={ds.type === type}
+            role="radio"
+            aria-checked={ds.type === type}
+            onclick={() => { if (ds.type !== type) updateType(dsIdx, type) }}
+          >{$t(type)}</button>
+        {/each}
+      </div>
+
+      {#each ds.exercises as ex, exIdx (exIdx)}
+        <div class="exercise">
+          {#if ds.exercises.length > 1}
+            <div class="exercise-head">
+              <span class="muted tnum">{$t('exercise')} {exIdx + 1}</span>
+              <button class="btn btn-ghost btn-icon" onclick={() => removeExercise(dsIdx, exIdx)} title={$t('removeExercise')} aria-label={$t('removeExercise')}>
+                <Icon name="x" />
+              </button>
             </div>
           {/if}
+          <div class="fields">
+            {#each fieldsFor(ds.type) as field (field.key)}
+              <div class="num key">
+                <label class="num-label" for="f-{dsIdx}-{exIdx}-{field.key}">{$t(field.label)}</label>
+                <div class="stepper">
+                  <button class="step" onclick={() => nudge(ex, field, -1)} aria-label="{$t(field.label)} -{field.step}" disabled={Number(ex[field.key]) <= field.min}>
+                    <Icon name="minus" />
+                  </button>
+                  <input
+                    id="f-{dsIdx}-{exIdx}-{field.key}"
+                    class="value tnum"
+                    type="number"
+                    inputmode="numeric"
+                    bind:value={ex[field.key]}
+                    min={field.min}
+                    max={field.max}
+                  />
+                  <button class="step" onclick={() => nudge(ex, field, 1)} aria-label="{$t(field.label)} +{field.step}" disabled={Number(ex[field.key]) >= field.max}>
+                    <Icon name="plus" />
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
         </div>
       {/each}
 
-      <button class="btn-secondary btn-sm" onclick={() => addExercise(dsIdx)}>
-        {$t('addExercise')}
+      <button class="key key-line key-row add" onclick={() => addExercise(dsIdx)}>
+        <Icon name="plus" />{$t('addExercise').replace(/^\+\s*/, '')}
       </button>
-    </div>
+    </section>
   {/each}
 
-  <button class="btn-secondary" onclick={addStage}>{$t('addStage')}</button>
+  <button class="key key-line key-row add" onclick={addStage}>
+    <Icon name="plus" />{$t('addStage').replace(/^\+\s*/, '')}
+  </button>
 
-  <div class="editor-actions">
-    <button class="btn-primary" onclick={save}>{$t('save')}</button>
-    <button class="btn-secondary" onclick={onCancel}>{$t('back')}</button>
+  <div class="actions">
+    <button class="key key-white" onclick={save}>
+      <Icon name="check" />
+      <span>{$t('save')}</span>
+    </button>
+    <button class="key" onclick={onCancel}>
+      <Icon name="arrow-left" />
+      <span>{$t('back')}</span>
+    </button>
   </div>
 </div>
 
@@ -208,111 +249,144 @@
   .program-editor {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding-bottom: 1rem;
+    gap: 12px;
+    padding-bottom: 8px;
   }
 
-  h3 {
-    color: var(--text-secondary);
-    font-weight: 600;
-  }
-
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-  }
-
-  label span {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-  }
-
-  .stage-block {
-    background: var(--bg-secondary);
-    border-radius: var(--radius);
-    padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .stage-header {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .stage-header input {
-    flex: 1;
-  }
-
-  select {
-    font-family: var(--font-sans);
-    font-size: 0.9rem;
-    padding: 0.5rem;
-    background: var(--bg-surface);
-    color: var(--text-primary);
-    border: 2px solid var(--bg-surface);
-    border-radius: var(--radius);
-  }
-
-  .exercise-block {
-    position: relative;
-    padding: 0.5rem;
-    background: var(--bg-primary);
-    border-radius: var(--radius);
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .btn-remove-exercise {
-    position: absolute;
-    top: 0.3rem;
-    right: 0.3rem;
-    width: 22px;
-    height: 22px;
-    padding: 0;
+  .head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: var(--danger);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    border-radius: var(--radius);
-    font-size: 0.65rem;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 4px 0;
+  }
+
+  .head h2 {
+    font-size: 1.375rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .block { display: block; }
+
+  .stage {
+    padding: 14px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .stage-head, .exercise-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+    padding-left: 6px;
+  }
+
+  .stage-no { font-size: 0.8125rem; font-weight: 800; color: var(--muted); }
+  .exercise-head { font-size: 0.8125rem; font-weight: 700; }
+  .stage-head .btn, .exercise-head .btn { height: 36px; width: 36px; color: var(--muted); }
+
+  .types {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .type {
+    height: 44px;
+    border-radius: 14px;
+    background: var(--key);
+    box-shadow: var(--key-shadow);
+    font-size: 0.875rem;
     font-weight: 700;
-    opacity: 0.6;
-    cursor: pointer;
-    transition: opacity 0.15s, border-color 0.15s;
+    color: var(--muted);
   }
 
-  .btn-remove-exercise:hover {
-    opacity: 1;
-    border-color: var(--danger);
+  .type.on {
+    background: var(--fg);
+    color: var(--ink);
+    box-shadow: var(--white-shadow);
   }
 
-  .field-row {
-    display: flex;
-    gap: 0.5rem;
+  .exercise { display: flex; flex-direction: column; gap: 6px; }
+
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 
-  input[type='number'] {
+  /* Each number is its own key: label on top, stepper below */
+  .num {
+    padding: 10px 10px 8px;
+    gap: 6px;
+    min-height: 0;
+    justify-content: flex-start;
+  }
+
+  .num-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--muted);
+    padding-left: 4px;
+  }
+
+  .stepper {
+    display: grid;
+    grid-template-columns: 36px 1fr 36px;
+    align-items: center;
     width: 100%;
-    padding: 0.5rem;
+    gap: 4px;
   }
 
-  .btn-sm {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
+  .step {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: var(--key-2);
   }
 
-  .editor-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    padding-top: 0.5rem;
+  .step :global(svg) { width: 18px; height: 18px; }
+  .step:disabled { opacity: 0.3; }
+  .step:active:not(:disabled) { filter: brightness(1.3); }
+
+  .value {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
+
+  .value::-webkit-outer-spin-button,
+  .value::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .value:focus-visible { outline: 2px solid var(--fg); outline-offset: 0; }
+
+  .add {
+    min-height: 52px;
+    color: var(--muted);
+  }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding-top: 10px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 14px);
+  }
+
+  .actions .key { min-height: 64px; flex-direction: row; align-items: center; justify-content: flex-start; }
 </style>

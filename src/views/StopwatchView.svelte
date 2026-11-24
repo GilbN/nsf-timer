@@ -3,6 +3,8 @@
   import { t } from '../lib/i18n.js'
   import { TimerEngine } from '../lib/timer/TimerEngine.js'
   import SettingsMenu from '../components/SettingsMenu.svelte'
+  import Display from '../components/ui/Display.svelte'
+  import Icon from '../components/ui/Icon.svelte'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
   import { beepStop } from '../lib/audio.js'
 
@@ -85,6 +87,16 @@
   let isCountdown = $derived(targetMs > 0)
   let displayMs   = $derived(isCountdown ? Math.max(0, targetMs - elapsed) : elapsed)
   let display     = $derived(formatMs(displayMs))
+  let mainText    = $derived(
+    $preferences.stopwatchFormat === 'seconds'
+      ? String(Math.floor(displayMs / 1000))
+      : `${display.min}:${display.sec}`
+  )
+  let canEdit     = $derived(!running && elapsed === 0)
+  let toggleLabel = $derived(running ? $t('pause') : elapsed > 0 ? $t('resume') : $t('start'))
+
+  /** @param {number} n */
+  const pad2 = (n) => String(n).padStart(2, '0')
 
   $effect(() => {
     if (running && $preferences.wakeLockEnabled) {
@@ -108,336 +120,211 @@
 </script>
 
 <div class="view stopwatch-view">
-  <div class="header">
-    <div class="title-row">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="header-icon">
-        <circle cx="12" cy="13" r="8"/>
-        <polyline points="12 9 12 13 14.5 15"/>
-        <path d="M9 3h6M12 3v2"/>
-      </svg>
-      <h2>{$t('stopwatch')}</h2>
+  <div class="top-bar">
+    <div class="cluster">
+      <button class="btn" onclick={goBack}><Icon name="arrow-left" />{$t('back')}</button>
+      <h1 class="title">{$t('stopwatch')}</h1>
     </div>
     <SettingsMenu />
   </div>
 
-  <div class="display-area">
+  <Display class="sw-display">
+    <div class="line">
+      <span class="chip">
+        <Icon name={isCountdown ? 'clock' : 'stopwatch'} />
+        {#if isCountdown}{pad2(inputMin)}:{pad2(inputSec)}{:else}{$t('stopwatch')}{/if}
+      </span>
+    </div>
+
     {#if editing}
-      <div class="editor-wrapper">
-        <div class="editor">
-          <div class="editor-field">
-            <button class="editor-btn" onclick={() => changeMin(1)}>▲</button>
-            <input
-              class="editor-input"
-              type="number"
-              min="0"
-              max="99"
-              bind:value={inputMin}
-              onfocus={(e) => e.currentTarget.select()}
-              oninput={(e) => { inputMin = Math.min(99, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
-            />
-            <button class="editor-btn" onclick={() => changeMin(-1)}>▼</button>
-          </div>
-          <span class="editor-colon">:</span>
-          <div class="editor-field">
-            <button class="editor-btn" onclick={() => changeSec(1)}>▲</button>
-            <input
-              class="editor-input"
-              type="number"
-              min="0"
-              max="59"
-              bind:value={inputSec}
-              onfocus={(e) => e.currentTarget.select()}
-              oninput={(e) => { inputSec = Math.min(59, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
-            />
-            <button class="editor-btn" onclick={() => changeSec(-1)}>▼</button>
-          </div>
-        </div>
-        <div class="editor-labels">
-          <span class="editor-label">{$t('countdownMinLabel')}</span>
-          <span class="editor-label">{$t('countdownSecondsLabel')}</span>
-        </div>
-      </div>
-    {:else if running}
-      <div class="time running">
-        {#if $preferences.stopwatchFormat === 'seconds'}
-          <span class="digits">{Math.floor(displayMs / 1000)}</span>
-            <span class="colon small">.</span>
-            <span class="digits sub">{display.ms}</span>
-        {:else}
-          <span class="digits">{display.min}</span>
-          <span class="colon">:</span>
-          <span class="digits">{display.sec}</span>
-            <span class="colon small">.</span>
-            <span class="digits sub">{display.ms}</span>
-        {/if}
+      <div class="editor">
+        <label class="field">
+          <input
+            class="editor-input digits"
+            type="number"
+            min="0"
+            max="99"
+            inputmode="numeric"
+            bind:value={inputMin}
+            onfocus={(e) => e.currentTarget.select()}
+            oninput={(e) => { inputMin = Math.min(99, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
+          />
+          <span class="unit">{$t('countdownMinLabel')}</span>
+        </label>
+        <span class="colon digits">:</span>
+        <label class="field">
+          <input
+            class="editor-input digits"
+            type="number"
+            min="0"
+            max="59"
+            inputmode="numeric"
+            bind:value={inputSec}
+            onfocus={(e) => e.currentTarget.select()}
+            oninput={(e) => { inputSec = Math.min(59, Math.max(0, parseInt(e.currentTarget.value) || 0)) }}
+          />
+          <span class="unit">{$t('countdownSecondsLabel')}</span>
+        </label>
       </div>
     {:else}
-      <button class="time-display-btn" onclick={() => { if (elapsed === 0) editing = !editing }}
-        class:editable={elapsed === 0}>
-        <div class="time">
-          {#if $preferences.stopwatchFormat === 'seconds'}
-            <span class="digits">{Math.floor(displayMs / 1000)}</span>
-              <span class="colon small">.</span>
-              <span class="digits sub">{display.ms}</span>
-          {:else}
-            <span class="digits">{display.min}</span>
-            <span class="colon">:</span>
-            <span class="digits">{display.sec}</span>
-              <span class="colon small">.</span>
-              <span class="digits sub">{display.ms}</span>
-          {/if}
-        </div>
+      <button
+        class="time"
+        class:editable={canEdit}
+        class:running
+        class:paused={!running && elapsed > 0}
+        onclick={() => { if (elapsed === 0) editing = !editing }}
+        disabled={!canEdit}
+        aria-label={canEdit ? `${$t('countdownMinLabel')} / ${$t('countdownSecondsLabel')}` : undefined}
+      >
+        <span class="digits sw-digits" style="--chars: {mainText.length + 1}">{mainText}<span class="hund">.{display.ms}</span></span>
       </button>
     {/if}
-  </div>
 
-  <div class="controls">
-    <button
-      class="btn-toggle"
-      class:btn-start={!running}
-      class:btn-pause={running}
-      onclick={toggle}
-    >
-      {#if running}
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-        {$t('pause')}
-      {:else}
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        {elapsed > 0 ? $t('resume') : $t('start')}
-      {/if}
-    </button>
-    <button class="btn-secondary btn-large" onclick={reset}>
-      {$t('reset')}
-    </button>
-  </div>
+    {#if canEdit && !editing}
+      <div class="line"><span class="sub tap"><Icon name="edit" />{$t('countdownHint')}</span></div>
+    {/if}
+  </Display>
 
-  <button class="btn-back" onclick={goBack}>
-    ← {$t('back')}
-  </button>
+  <div class="pad" class:editing>
+    {#if editing}
+      <div class="adjust">
+        <button class="key key-row key-center" onclick={() => changeMin(-1)} aria-label="- {$t('countdownMinLabel')}"><Icon name="minus" />{$t('countdownMinLabel')}</button>
+        <button class="key key-row key-center" onclick={() => changeMin(1)} aria-label="+ {$t('countdownMinLabel')}"><Icon name="plus" />{$t('countdownMinLabel')}</button>
+        <button class="key key-row key-center" onclick={() => changeSec(-1)} aria-label="- {$t('countdownSecondsLabel')}"><Icon name="minus" />{$t('countdownSecondsLabel')}</button>
+        <button class="key key-row key-center" onclick={() => changeSec(1)} aria-label="+ {$t('countdownSecondsLabel')}"><Icon name="plus" />{$t('countdownSecondsLabel')}</button>
+      </div>
+    {/if}
+    <div class="main">
+      <button class="key key-white" onclick={toggle}>
+        <Icon name={running ? 'pause' : 'play'} filled />
+        <span>{toggleLabel}</span>
+      </button>
+      <button class="key" onclick={reset}>
+        <Icon name="reset" />
+        <span>{$t('reset')}</span>
+      </button>
+    </div>
+  </div>
 </div>
 
 <style>
-  .stopwatch-view {
-    justify-content: center;
-    gap: 1.75rem;
+  .title { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
+
+  :global(.sw-display) {
+    flex: 1;
+    min-height: 0;
+    margin: 6px var(--pad-x) 0;
   }
 
-  .header {
+  .line {
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .title-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .header-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--text-secondary);
-  }
-
-  h2 {
-    font-size: 1.1rem;
+    gap: 12px;
+    font-size: 0.875rem;
     font-weight: 700;
-    color: var(--text-primary);
+    flex: none;
   }
 
-  .display-area {
-    display: flex;
+  .chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    flex: 1;
-    max-height: 300px;
+    gap: 7px;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: var(--chip-bg);
+    color: var(--chip-fg);
+    font-size: 0.8125rem;
+    font-weight: 800;
   }
 
+  .chip :global(svg) { width: 16px; height: 16px; }
+  .sub { color: var(--sub); font-weight: 600; }
+  .tap { display: inline-flex; align-items: center; gap: 6px; }
+  .tap :global(svg) { width: 14px; height: 14px; }
+
+  /* The digits fill whatever room the display has */
   .time {
-    display: flex;
-    align-items: baseline;
-    gap: 0.02em;
-    transition: color 0.3s;
-  }
-
-  .time.running .digits { color: var(--accent); }
-  .time.running .colon { color: var(--accent); opacity: 0.5; }
-
-  .digits {
-    font-family: var(--font-mono);
-    font-size: clamp(4.5rem, 20vw, 10rem);
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    transition: color 0.3s;
-  }
-
-  .digits.sub {
-    font-size: clamp(2.25rem, 9vw, 4.5rem);
-    color: var(--text-secondary);
-  }
-
-  .colon {
-    font-family: var(--font-mono);
-    font-size: clamp(3.5rem, 14vw, 7.5rem);
-    font-weight: 900;
-    color: var(--text-secondary);
-    align-self: baseline;
-    margin-bottom: 0.04em;
-    transition: color 0.3s;
-  }
-
-  .colon.small {
-    font-size: clamp(2rem, 8vw, 4rem);
-  }
-
-  .controls {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-  }
-
-  .controls button {
     flex: 1;
-    max-width: 180px;
-  }
-
-  .btn-toggle {
+    min-height: 0;
+    width: 100%;
+    container-type: size;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 52px;
-    font-size: 1rem;
-    font-weight: 700;
-    border-radius: var(--radius);
+    align-items: flex-end;
+    text-align: left;
+    color: var(--faint);
   }
 
-  .btn-toggle svg {
-    width: 1.2em;
-    height: 1.2em;
-    flex-shrink: 0;
+  .time:disabled { cursor: default; }
+  .time.running { color: #e4e4e7; }
+  .time.paused { color: var(--muted); }
+  .time.editable { color: var(--fg); }
+
+  .sw-digits {
+    font-size: min(calc(100cqw / (var(--chars) * 0.58)), 80cqh);
+    white-space: nowrap;
   }
 
-  .btn-start {
-    background: var(--accent);
-    color: #0d0d1a;
-  }
-
-  .btn-start:hover { background: var(--accent-dim); }
-
-  .btn-pause {
-    background: var(--bg-surface);
-    color: var(--text-primary);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-
-  .btn-pause:hover { background: #252550; }
-
-  .btn-back {
-    align-self: center;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 0.3rem 0.75rem;
-    border-radius: var(--radius);
-    opacity: 0.5;
-    transition: opacity 0.15s;
-  }
-
-  .btn-back:hover { opacity: 0.9; }
-
-  /* ── Time display button (tappable when stopped) ── */
-  .time-display-btn {
-    background: transparent;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .time-display-btn:hover .digits { opacity: 0.75; }
-
-  .time-display-btn:not(.editable) { cursor: default; }
-
-  /* ── Segmented countdown editor ── */
-  .editor-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-  }
+  .hund { font-size: 0.42em; color: var(--muted); letter-spacing: -0.02em; margin-left: 0.04em; }
 
   .editor {
+    flex: 1;
+    min-height: 0;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 4px;
   }
 
-  .editor-field {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-  }
+  .field { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
   .editor-input {
-    font-family: var(--font-mono);
-    font-size: clamp(3.5rem, 14vw, 7.5rem);
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    width: 3ch;
-    background: transparent;
-    color: var(--text-primary);
+    width: 2.4ch;
+    font-size: clamp(4rem, 22vw, 7rem);
+    background: none;
+    border: 0;
+    border-bottom: 3px solid var(--key-2);
     text-align: center;
+    color: var(--fg);
+    padding: 0;
     -moz-appearance: textfield;
     appearance: textfield;
   }
 
+  .editor-input:focus-visible { outline: none; border-bottom-color: var(--fg); }
   .editor-input::-webkit-outer-spin-button,
-  .editor-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .editor-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-  .editor-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 1.5rem;
-    line-height: 1;
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: color 0.15s;
-  }
+  .colon { font-size: clamp(3rem, 16vw, 5rem); color: var(--faint); padding-bottom: 28px; }
+  .unit { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 
-  .editor-btn:hover { color: var(--text-primary); }
-
-  .editor-colon {
-    font-family: var(--font-mono);
-    font-size: clamp(4.5rem, 20vw, 10rem);
-    font-weight: 900;
-    color: var(--text-secondary);
-    align-self: center;
-    margin-bottom: 0.04em;
-  }
-
-  .editor-labels {
+  .pad {
+    flex: none;
     display: flex;
-    gap: 3.5rem;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px var(--pad-x) 0;
   }
 
-  .editor-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.5;
+  .adjust {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .adjust .key { min-height: 56px; padding: 10px 14px; }
+
+  .pad .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    height: clamp(128px, 24dvh, 190px);
+  }
+
+  .pad.editing .main { height: clamp(104px, 17dvh, 150px); }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    .stopwatch-view { max-width: 1000px; }
   }
 </style>
