@@ -70,6 +70,7 @@ describe('Modal', () => {
       let closes = 0
       app = mount(ModalHost, { target: document.body, props: { variant: 'sheet', onClose: () => { closes++ } } })
       flushSync()
+      Object.defineProperty(document.querySelector('dialog'), 'offsetHeight', { value: 400 })
       gesture(/** @type {Element} */ (document.querySelector('dialog p')))
       await new Promise((r) => setTimeout(r, 300))
       return closes
@@ -80,6 +81,14 @@ describe('Modal', () => {
         const moves = swipe(p, [100, 140, 220, 320])
         expect(moves.every(e => e.defaultPrevented)).toBe(true)
       })).toBe(1)
+    })
+
+    it('snaps back from a short slow pull', async () => {
+      expect(await closesAfter((p) => { swipe(p, [100, 130, 160, 190], 200) })).toBe(0)
+    })
+
+    it('closes on a short flick, even with one move', async () => {
+      expect(await closesAfter((p) => { swipe(p, [100, 160], 30) })).toBe(1)
     })
 
     it('leaves a tap and an upward scroll alone', async () => {

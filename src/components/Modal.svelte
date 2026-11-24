@@ -42,7 +42,7 @@
   /** @param {PointerEvent} e */
   function onPointerDown(e) {
     pressedOnBackdrop = e.target === dialog && isOutside(e)
-    if (e.pointerType !== 'touch' && e.button === 0) dragStart(e.clientY, e.target)
+    if (e.pointerType !== 'touch' && e.button === 0) dragStart(e.clientY, e.timeStamp, e.target)
   }
 
   /** @param {PointerEvent} e */
@@ -75,15 +75,16 @@
 
   /**
    * @param {number} y
+   * @param {number} t event timestamp in ms
    * @param {EventTarget | null} target
    */
-  function dragStart(y, target) {
+  function dragStart(y, t, target) {
     drag = null
     if (variant !== 'sheet' || !dialog || target === dialog || !(target instanceof Element)) return
     for (let el = /** @type {Element | null} */ (target); el && el !== dialog; el = el.parentElement) {
       if (el.scrollTop > 0) return
     }
-    drag = { startY: y, lastY: y, lastT: 0, speed: 0, offset: 0, dragging: false }
+    drag = { startY: y, lastY: y, lastT: t, speed: 0, offset: 0, dragging: false }
   }
 
   /**
@@ -99,9 +100,9 @@
       if (dy < -SLOP) drag = null
       if (dy <= SLOP) return false
       d.dragging = true
-      dialog.getAnimations?.().forEach(a => a.cancel())
+      dialog.getAnimations().forEach(a => a.cancel())
     }
-    if (d.lastT && t > d.lastT) d.speed = (y - d.lastY) / (t - d.lastT)
+    if (t > d.lastT) d.speed = (y - d.lastY) / (t - d.lastT)
     d.lastY = y
     d.lastT = t
     d.offset = Math.max(0, dy - SLOP)
@@ -124,10 +125,10 @@
     el.style.transform = ''
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
     if (!cancelled && (d.offset > el.offsetHeight * DISMISS_FRACTION || flicked)) {
-      if (reduce || !el.animate) return el.close()
+      if (reduce) return el.close()
       el.animate([{ transform: from }, { transform: 'translateY(100%)' }], { duration: 160, easing: 'ease-in', fill: 'forwards' })
         .finished.then(() => { if (el.open) el.close() }, () => {})
-    } else if (!reduce && el.animate) {
+    } else if (!reduce) {
       el.animate([{ transform: from }, { transform: 'none' }], { duration: 160, easing: 'ease-out' })
     }
   }
@@ -137,12 +138,15 @@
     const el = dialog
     /** @param {TouchEvent} e */
     const start = (e) => {
-      if (e.touches.length === 1) dragStart(e.touches[0].clientY, e.target)
-      else drag = null
+      if (e.touches.length === 1) dragStart(e.touches[0].clientY, e.timeStamp, e.target)
+      else dragEnd(e.timeStamp, true)
     }
     /** @param {TouchEvent} e */
     const move = (e) => {
-      if (drag && e.touches.length === 1 && dragMove(e.touches[0].clientY, e.timeStamp) && e.cancelable) e.preventDefault()
+      if (!drag || e.touches.length !== 1) return
+      // Not cancelable means the browser already took the gesture as a scroll
+      if (!e.cancelable) return dragEnd(e.timeStamp, true)
+      if (dragMove(e.touches[0].clientY, e.timeStamp)) e.preventDefault()
     }
     /** @param {TouchEvent} e */
     const end = (e) => dragEnd(e.timeStamp)
