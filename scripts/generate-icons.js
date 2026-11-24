@@ -27,7 +27,6 @@ function buildIco(pngBuffers) {
   for (const png of pngBuffers) {
     const entry = Buffer.alloc(dirEntrySize)
     // width/height: 0 means 256 in ICO spec; for <=255 use actual value
-    const meta = sharp(png)
     // We already know the sizes we're passing in, but we encode from the PNG header
     // For simplicity, we set width/height to 0 (works for all sizes up to 256)
     entry.writeUInt8(0, 0)        // width  (0 = 256 or "read from data")

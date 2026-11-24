@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev       # Start Vite dev server with HMR
 npm run build     # Production build (outputs to dist/)
 npm run preview   # Preview production build locally
+npm test          # Vitest: unit tests plus integration tests against a real relay
+npm run check     # svelte-check type check (JS with checkJs)
+npm run lint      # ESLint (eslint-plugin-svelte)
 
 # WebSocket relay server (required for multi-device sync)
 cd server && npm run dev   # Dev (auto-restart on change)
@@ -16,7 +19,7 @@ cd server && npm start     # Production
 
 Set `VITE_WS_SERVER_URL=ws://localhost:8080` in `.env.local` for local development (already present).
 
-No test runner or linter is configured.
+Node 24 or newer (see `.nvmrc`). CI runs check, lint, tests and the build on every PR.
 
 ## Architecture Overview
 
@@ -29,20 +32,23 @@ The app uses a strict host/client topology:
 - **Host** creates a room with a 4-character code (e.g. `ABCD`), owns the `TimerScheduler`, and broadcasts state to all clients via the relay server.
 - **Clients** join by code, receive timer state via the relay, and display it. Clients cannot control the timer.
 - Room codes avoid ambiguous characters (no O, 0, I, 1, L).
-- The relay server (`server/index.js`) is stateless except for an in-memory room registry and a cached last `STATE_SYNC` per room for fast reconnection.
+- The relay server (`server/index.js`) is stateless except for an in-memory room registry and a cached last `STATE_SYNC` per room for fast reconnection. It also serves `GET /healthz`.
+- On `ROOM_CREATED` the relay hands the host a `hostToken`. Reclaiming the room (reload, relay reconnect, rejoin from history) needs that token, so it is saved with the room in localStorage. A reclaim closes the previous host socket with code 4001, and that host stops reconnecting.
 
-Global singletons `window.__nsfHost` (SocketHost), `window.__nsfClient` (SocketClient), and `window.__nsfScheduler` (TimerScheduler) hold the active connection/scheduler. These are set in `App.svelte` during session creation or restore.
+`src/lib/session.js` holds the active `SocketHost`, `SocketClient` and `TimerScheduler` in its `session` object. Use its helpers (`hostRoom`, `joinRoom`, `startScheduler`, `stopScheduler`, `rememberRoom`, `endSession`) instead of constructing these classes in views.
 
 ### State flow
 
-1. `TimerScheduler` (host-only) drives the countdown via `TimerEngine` and updates the `timerState` Svelte store.
-2. `TimerScheduler.onStateChange` callback triggers `SocketHost.broadcastState(state)`, which sends `STATE_SYNC` messages to all clients via the relay.
+1. `TimerScheduler` (host-only) drives the countdown via `TimerEngine` and updates the `timerState` Svelte store. The engine ticks every animation frame (with a backup `setTimeout` so it keeps running in background tabs), but the scheduler only writes the store when the displayed second changes.
+2. Discrete changes (phase, series, target) go through `onStateChange` to `SocketHost.broadcastState(state)` as a full `STATE_SYNC`. Countdown progress goes through `onTick` to `SocketHost.broadcastTick` as a small `TICK` once per second.
 3. Clients receive messages in `SocketClient._handleMessage` and write directly to the `timerState` store.
 4. All Svelte components read from `timerState` (and other stores in `src/lib/stores.js`) reactively.
 
 ### View routing
 
 `currentView` store in `stores.js` drives routing — no router library. Views: `home` → `lobby` → `timer` (or `stopwatch` as a standalone mode). `App.svelte` renders the matching view component.
+
+Modals use `src/components/Modal.svelte`, a native `<dialog>` that handles focus, Escape and the backdrop. Ask for confirmation with `confirmAction()` from `src/lib/confirm.js` rather than `window.confirm()`. Fonts are self-hosted through `@fontsource-variable` so the PWA keeps them offline.
 
 ### Key files
 

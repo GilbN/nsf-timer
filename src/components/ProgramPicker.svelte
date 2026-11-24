@@ -2,6 +2,7 @@
   import { get } from 'svelte/store'
   import { preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
+  import { confirmAction } from '../lib/confirm.js'
   import { getAllPrograms } from '../lib/programs/registry.js'
   import { loadCustomPrograms, deleteCustomProgram } from '../lib/storage.js'
 
@@ -22,9 +23,9 @@
     if (onEdit) onEdit(program)
   }
 
-  function handleDelete(e, program) {
+  async function handleDelete(e, program) {
     e.stopPropagation()
-    if (!confirm(get(t)('confirmDeleteProgram'))) return
+    if (!(await confirmAction(get(t)('confirmDeleteProgram'), get(t)('deleteProgram')))) return
     deleteCustomProgram(program.id)
     customPrograms = loadCustomPrograms()
   }
@@ -34,7 +35,7 @@
   <p class="section-label">{$t('selectProgram')}</p>
 
   <div class="program-list">
-    {#each builtinPrograms as program}
+    {#each builtinPrograms as program (program.id)}
       <div class="program-entry" class:expanded={expandedId === program.id}>
         <div class="program-row">
           <button class="program-select" onclick={() => onSelect(program.id)}>
@@ -85,7 +86,7 @@
               <div class="info-row info-row-groups">
                 <span class="info-label">{$t('weaponGroups')}</span>
                 <ul class="weapon-group-list">
-                  {#each (program.weaponGroups[lang] || program.weaponGroups.no) as group}
+                  {#each (program.weaponGroups[lang] || program.weaponGroups.no) as group (group)}
                     <li>{group}</li>
                   {/each}
                 </ul>
@@ -96,7 +97,7 @@
       </div>
     {/each}
 
-    {#each customPrograms as program}
+    {#each customPrograms as program (program.id)}
       <div class="program-entry">
         <div class="program-row">
           <button class="program-select" onclick={() => onSelect(program.id)}>

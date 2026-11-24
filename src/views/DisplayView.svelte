@@ -1,9 +1,9 @@
 <script>
-  import { currentView, roomState, timerState, preferences, formattedTime } from '../lib/stores.js'
+  import { roomState, timerState, preferences, formattedTime } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
   import { getProgramById } from '../lib/programs/registry.js'
   import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock.js'
-  import { clearRoomState, clearTimerState, addRoomToHistory, loadRoomState } from '../lib/storage.js'
+  import { session, rememberRoom, endSession } from '../lib/session.js'
   import ConnectionStatus from '../components/ConnectionStatus.svelte'
 
   let connectionStatus = $state('connected')
@@ -25,7 +25,7 @@
 
   // Client connection status
   $effect(() => {
-    const client = window.__nsfClient
+    const client = session.client
     if (client) {
       client.onStatusChange((status) => {
         if (status === 'connected') connectionStatus = 'connected'
@@ -50,24 +50,8 @@
   })
 
   function disconnect() {
-    if ($roomState.code) {
-      const savedRoom = loadRoomState()
-      addRoomToHistory({
-        code: $roomState.code,
-        isHost: false,
-        isSpectator: true,
-        name: savedRoom?.name,
-        lane: savedRoom?.lane,
-      })
-    }
-    if (window.__nsfClient) {
-      window.__nsfClient.destroy()
-      window.__nsfClient = null
-    }
-    clearTimerState()
-    clearRoomState()
-    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
-    currentView.set('home')
+    rememberRoom({ isHost: false, isSpectator: true })
+    endSession()
   }
 </script>
 

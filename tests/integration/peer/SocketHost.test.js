@@ -48,11 +48,40 @@ describe('SocketHost.createRoom', () => {
     // Wait for server to register the disconnect
     await new Promise(r => setTimeout(r, 50))
 
+    expect(host1.hostToken).toMatch(/^[0-9a-f-]{36}$/)
+
     const host2 = new SocketHost()
-    const reclaimed = await host2.createRoom(code)
+    const reclaimed = await host2.createRoom(code, host1.hostToken)
     expect(reclaimed).toBe(code)
+    expect(host2.hostToken).toBe(host1.hostToken)
 
     host2.destroy()
+  })
+
+  it('stops reconnecting when another socket reclaims the room with its token', async () => {
+    const host1 = new SocketHost()
+    const code = await host1.createRoom()
+
+    const host2 = new SocketHost()
+    await host2.createRoom(code, host1.hostToken)
+    // Give host1 time to see the 4001 close and (wrongly) schedule a reconnect
+    await new Promise(r => setTimeout(r, 100))
+
+    expect(host1._destroyed).toBe(true)
+    expect(host1._reconnectTimer).toBeNull()
+    host2.destroy()
+  })
+
+  it('rejects a reclaim with the wrong token', async () => {
+    const host1 = new SocketHost()
+    const code = await host1.createRoom()
+    host1._destroyed = true
+    host1.ws.close()
+    await new Promise(r => setTimeout(r, 50))
+
+    const intruder = new SocketHost()
+    await expect(intruder.createRoom(code, 'not-the-token')).rejects.toThrow('code_taken')
+    intruder.destroy()
   })
 
   it('retries with a new code when the generated code is already taken', async () => {

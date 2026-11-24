@@ -1,9 +1,37 @@
 import { writable, derived } from 'svelte/store'
 
+/**
+ * @typedef {{ peerId: string, name: string, lane: string, jamsUsed: number, canJam: boolean }} Peer
+ *
+ * @typedef {object} RoomState
+ * @property {string | null} code
+ * @property {boolean} isHost
+ * @property {boolean} [isSpectator]
+ * @property {boolean} [isSolo]
+ * @property {Peer[]} connectedPeers
+ *
+ * @typedef {object} TimerState
+ * @property {string} phase 'idle' | 'loading' | 'shooting' | 'paused' | 'stopped'
+ * @property {string | null} programId
+ * @property {number} stageIndex
+ * @property {number} exerciseIndex
+ * @property {number} seriesIndex
+ * @property {number} remainingMs
+ * @property {number} totalMs
+ * @property {boolean} targetVisible
+ * @property {number} duelShowingIndex
+ * @property {number | null} phaseStartedAt
+ * @property {boolean} isReshoot
+ * @property {string | null} reshootPeerName
+ * @property {boolean} stageComplete
+ * @property {string | null} [stoppedReason]
+ */
+
 // View routing
 export const currentView = writable('home') // 'home' | 'lobby' | 'timer' | 'stopwatch' | 'display'
 
 // Room state
+/** @type {import('svelte/store').Writable<RoomState>} */
 export const roomState = writable({
   code: null,
   isHost: false,
@@ -13,6 +41,7 @@ export const roomState = writable({
 })
 
 // Timer state (authoritative on host, synced to clients)
+/** @type {import('svelte/store').Writable<TimerState>} */
 export const timerState = writable({
   phase: 'idle',          // 'idle' | 'loading' | 'shooting' | 'paused' | 'stopped'
   programId: null,

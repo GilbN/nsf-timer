@@ -5,6 +5,8 @@ import { WS_SERVER_URL } from '../config.js'
 
 const CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no O/0/I/1/L
 const RECONNECT_DELAY = 2000
+// Close code the relay uses when a newer socket reclaims this room.
+const HOST_REPLACED = 4001
 
 /**
  * Peer details stored per connection:
@@ -14,7 +16,10 @@ export class SocketHost {
   constructor() {
     this.ws = null
     this.connections = new Map() // peerId → { name, lane, jamsUsed, jamStageKeys }
+    /** @type {string | null} */
     this.code = null
+    /** @type {string | null} */
+    this.hostToken = null // secret from the relay that lets this host reclaim the room
     this._onPeersChange = null
     this._lastTimerState = null
     this._destroyed = false
@@ -33,9 +38,16 @@ export class SocketHost {
     return code
   }
 
-  async createRoom(existingCode = null) {
+  /**
+   * Create a room, or reclaim `existingCode` when `hostToken` is the token the
+   * relay gave out when the room was first created.
+   * @param {string | null} [existingCode]
+   * @param {string | null} [hostToken]
+   */
+  async createRoom(existingCode = null, hostToken = null) {
     this._destroyed = false
     this.code = existingCode || this.generateCode()
+    this.hostToken = hostToken
 
     return new Promise((resolve, reject) => {
       this._openSocket(resolve, reject, existingCode)
@@ -52,7 +64,7 @@ export class SocketHost {
     this.ws = ws
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ action: 'CREATE_ROOM', code: this.code }))
+      ws.send(JSON.stringify({ action: 'CREATE_ROOM', code: this.code, hostToken: this.hostToken }))
     }
 
     ws.onmessage = (event) => {
@@ -62,6 +74,7 @@ export class SocketHost {
       if (resolve) {
         // Still in initial setup — wait for ROOM_CREATED or ERROR
         if (envelope.action === 'ROOM_CREATED') {
+          this.hostToken = envelope.hostToken ?? this.hostToken
           this._syncRoomState()
           this._attachMessageHandler()
           resolve(this.code)
@@ -115,7 +128,13 @@ export class SocketHost {
       this._handleEnvelope(envelope)
     }
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (event) => {
+      if (event?.code === HOST_REPLACED) {
+        // Another tab or device reclaimed the room with our token. Reconnecting
+        // would just take it back, so stop here.
+        this._destroyed = true
+        return
+      }
       if (!this._destroyed) {
         // Host lost connection to relay — attempt to reclaim room
         this._scheduleReconnect()
@@ -199,18 +218,19 @@ export class SocketHost {
   }
 
   async _reconnect() {
-    return new Promise((resolve, reject) => {
+    return /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
       const ws = new WebSocket(WS_SERVER_URL)
       this.ws = ws
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ action: 'CREATE_ROOM', code: this.code }))
+        ws.send(JSON.stringify({ action: 'CREATE_ROOM', code: this.code, hostToken: this.hostToken }))
       }
 
       ws.onmessage = (event) => {
         let envelope
         try { envelope = JSON.parse(event.data) } catch { return }
         if (envelope.action === 'ROOM_CREATED') {
+          this.hostToken = envelope.hostToken ?? this.hostToken
           this._attachMessageHandler()
           // Re-broadcast current state so any remaining clients get it
           const state = this._lastTimerState || get(timerState)
@@ -225,9 +245,13 @@ export class SocketHost {
 
       ws.onerror = () => reject(new Error('reconnect failed'))
       ws.onclose = () => reject(new Error('closed during reconnect'))
-    })
+    }))
   }
 
+  /**
+   * @param {string | null} [stageKey]
+   * @returns {import('../stores.js').Peer[]}
+   */
   getPeerDetails(stageKey = null) {
     const peers = []
     for (const [peerId, entry] of this.connections) {
@@ -308,6 +332,14 @@ export class SocketHost {
     }
   }
 
+  /** Lightweight per-second countdown update; see TimerScheduler.onTick. */
+  broadcastTick(tick) {
+    if (this._lastTimerState) {
+      this._lastTimerState = { ...this._lastTimerState, ...tick }
+    }
+    this.broadcast(MSG.TICK, tick)
+  }
+
   _sendEnvelope(envelope) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       try {
@@ -338,6 +370,6 @@ export class SocketHost {
       this.ws = null
     }
     this.connections.clear()
-    roomState.set({ code: null, isHost: false, connectedPeers: [] })
+    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
   }
 }

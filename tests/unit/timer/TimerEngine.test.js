@@ -206,4 +206,45 @@ describe('TimerEngine', () => {
       expect(engine.isRunning).toBe(false)
     })
   })
+
+  describe('background tabs (no animation frames)', () => {
+    let realRaf
+    beforeEach(() => {
+      // Browsers stop calling rAF callbacks while the tab is hidden.
+      realRaf = globalThis.requestAnimationFrame
+      globalThis.requestAnimationFrame = () => 0
+    })
+    afterEach(() => {
+      globalThis.requestAnimationFrame = realRaf
+    })
+
+    it('still completes the countdown on time via the backup timer', () => {
+      const engine = new TimerEngine()
+      const onComplete = vi.fn()
+      engine.startCountdown(2500, () => {}, onComplete)
+
+      vi.advanceTimersByTime(2499)
+      expect(onComplete).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(onComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('ticks on each whole-second boundary', () => {
+      const engine = new TimerEngine()
+      const ticks = []
+      engine.startCountdown(3000, (ms) => ticks.push(ms), () => {})
+
+      vi.advanceTimersByTime(3000)
+      expect(ticks).toEqual([3000, 2000, 1000, 0])
+    })
+  })
+
+  it('runs a single tick loop even when frames and the backup timer race', () => {
+    const engine = new TimerEngine()
+    let ticks = 0
+    engine.startCountdown(10_000, () => { ticks++ }, () => {})
+    vi.advanceTimersByTime(1000)
+    // ~16ms frames for 1s is about 63 ticks; two loops would be twice that.
+    expect(ticks).toBeLessThan(80)
+  })
 })

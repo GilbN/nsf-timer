@@ -53,7 +53,7 @@ export class SocketClient {
               this.destroy()
             }
           }, 10000)
-        : null
+        : undefined
 
       ws.onopen = () => {
         ws.send(JSON.stringify({
@@ -223,6 +223,6 @@ export class SocketClient {
       try { this.ws.close() } catch {}
       this.ws = null
     }
-    roomState.set({ code: null, isHost: false, isSpectator: false, connectedPeers: [] })
+    roomState.set({ code: null, isHost: false, isSpectator: false, isSolo: false, connectedPeers: [] })
   }
 }

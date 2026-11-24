@@ -2,9 +2,9 @@
   import { updateAvailable, updateDismissed, applyUpdate } from '../lib/updateAvailable.js'
   import { timerState } from '../lib/stores.js'
   import { t } from '../lib/i18n.js'
+  import Modal from './Modal.svelte'
 
   let visible = $derived($updateAvailable && !$updateDismissed)
-  let panelEl = $state(null)
   let matchInProgress = $derived(
     $timerState?.phase === 'loading' || $timerState?.phase === 'shooting'
   )
@@ -16,32 +16,11 @@
   function reload() {
     applyUpdate()
   }
-
-  $effect(() => {
-    if (!visible) return
-    const previouslyFocused = document.activeElement
-    panelEl?.focus()
-    function onKey(e) { if (e.key === 'Escape') dismiss() }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
-    }
-  })
 </script>
 
 {#if visible}
-  <div class="modal-backdrop" role="presentation" onclick={dismiss}>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div
-      class="modal-panel"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="update-modal-title"
-      tabindex="-1"
-      bind:this={panelEl}
-      onclick={(e) => e.stopPropagation()}
-    >
+  <Modal onClose={dismiss} labelledby="update-modal-title">
+    <div class="modal-panel">
       <div class="modal-header">
         <h2 id="update-modal-title" class="modal-title">{$t('updateAvailable')}</h2>
       </div>
@@ -57,20 +36,10 @@
         <button class="btn-primary" onclick={reload}>{$t('reloadNow')}</button>
       </div>
     </div>
-  </div>
+  </Modal>
 {/if}
 
 <style>
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 300;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .modal-panel {
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.08);

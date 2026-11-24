@@ -1,6 +1,8 @@
 <script>
   import { timerState, preferences } from '../lib/stores.js'
   import { t, getLocalizedName } from '../lib/i18n.js'
+  import { session } from '../lib/session.js'
+  import Modal from './Modal.svelte'
 
   let { program, onClose } = $props()
 
@@ -39,20 +41,20 @@
   }
 
   function handleConfirm() {
-    window.__nsfScheduler?.jumpTo(selectedStageIdx, selectedExerciseIdx, selectedSeriesIdx)
+    session.scheduler?.jumpTo(selectedStageIdx, selectedExerciseIdx, selectedSeriesIdx)
     onClose()
   }
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onClose}>
-  <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-    <h2 class="modal-title">{$t('jumpToPosition')}</h2>
+<Modal {onClose} labelledby="jump-to-title">
+  <div class="modal-panel">
+    <h2 id="jump-to-title" class="modal-title">{$t('jumpToPosition')}</h2>
 
     <!-- Stage selector -->
     <div class="field">
       <span class="field-label">{$t('stage')}</span>
       <div class="option-grid stage-grid">
-        {#each program.stages as stage, i}
+        {#each program.stages as stage, i (i)}
           <button
             class="option-btn stage-btn"
             class:selected={selectedStageIdx === i}
@@ -71,7 +73,7 @@
       <div class="field">
         <span class="field-label">{$t('exercise')}</span>
         <div class="option-grid exercise-grid">
-          {#each selectedStage.exercises as ex, i}
+          {#each selectedStage.exercises as ex, i (i)}
             <button
               class="option-btn exercise-btn"
               class:selected={selectedExerciseIdx === i}
@@ -90,7 +92,7 @@
       <div class="field">
         <span class="field-label">{$t('series')}</span>
         <div class="option-grid">
-          {#each { length: selectedExercise.seriesCount } as _, i}
+          {#each { length: selectedExercise.seriesCount } as _, i (i)}
             <button
               class="option-btn"
               class:selected={selectedSeriesIdx === i}
@@ -109,19 +111,9 @@
       <button class="btn-confirm" onclick={handleConfirm}>{$t('jumpTo')}</button>
     </div>
   </div>
-</div>
+</Modal>
 
 <style>
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .modal-panel {
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.08);

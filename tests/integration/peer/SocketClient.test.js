@@ -226,7 +226,7 @@ describe('SocketClient host presence', () => {
     await vi.waitFor(() => expect(statuses).toContain('hostDisconnected'))
 
     // Reclaim
-    const reclaim = await createHost(server.url, host.code)
+    const reclaim = await createHost(server.url, host.code, host.hostToken)
     await vi.waitFor(() => {
       const lastConnected = [...statuses].reverse().indexOf('connected')
       const lastDisconnected = [...statuses].reverse().indexOf('hostDisconnected')

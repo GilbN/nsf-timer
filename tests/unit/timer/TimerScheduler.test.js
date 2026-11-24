@@ -634,4 +634,41 @@ describe('TimerScheduler', () => {
       expect(scheduler.state.phase).toBe('idle')
     })
   })
+
+  describe('per-second updates', () => {
+    it('updates the store and calls onTick once per displayed second, not every frame', () => {
+      scheduler.loadProgram('standard')
+      const stateChanges = vi.fn()
+      const ticks = []
+      scheduler.onStateChange(stateChanges)
+      scheduler.onTick((tick) => ticks.push(tick))
+      let storeUpdates = 0
+      const unsubscribe = timerState.subscribe(() => { storeUpdates++ })
+      storeUpdates = 0
+
+      scheduler.startSeries() // loading phase starts
+      const changesAfterStart = stateChanges.mock.calls.length
+      vi.advanceTimersByTime(5000)
+      unsubscribe()
+
+      // Five seconds of ~16ms frames is ~300 engine ticks; only the second
+      // boundaries should reach the store and the network.
+      expect(ticks.length).toBeGreaterThanOrEqual(4)
+      expect(ticks.length).toBeLessThanOrEqual(6)
+      expect(storeUpdates).toBeLessThanOrEqual(changesAfterStart + 6)
+      expect(stateChanges.mock.calls.length).toBe(changesAfterStart)
+      expect(ticks.at(-1)).toEqual({ remainingMs: expect.any(Number), targetVisible: false })
+      expect(Math.ceil(get(timerState).remainingMs / 1000)).toBe(Math.ceil(scheduler.state.remainingMs / 1000))
+    })
+
+    it('captures the exact remaining time when paused', () => {
+      scheduler.loadProgram('standard')
+      scheduler.startSeries()
+      vi.advanceTimersByTime(1234)
+      scheduler.pause()
+      expect(get(timerState).phase).toBe('paused')
+      expect(get(timerState).remainingMs).toBe(scheduler.engine.remainingMs)
+    })
+  })
 })
+
