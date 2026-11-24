@@ -50,6 +50,12 @@ describe('startScheduler', () => {
 })
 
 describe('hostRoom replacement', () => {
+  afterEach(() => {
+    stopScheduler()
+    session.host = null
+    confirmRequest.set(null)
+  })
+
   it('cancels an open confirm and goes home when another tab takes the room', async () => {
     const host = await hostRoom()
     startScheduler('standard')
@@ -66,4 +72,3 @@ describe('hostRoom replacement', () => {
     expect(host).toBe(fakeHosts.at(-1))
   })
 })
-

@@ -21,4 +21,11 @@ export default [
     files: ['server/**/*.js', 'scripts/**/*.js', '*.config.js', 'tests/**/*.js'],
     languageOptions: { globals: { ...globals.node } },
   },
+  {
+    // Svelte compiles *.svelte.test.js files, so runes are allowed there
+    files: ['**/*.svelte.test.js'],
+    languageOptions: {
+      globals: { $state: 'readonly', $derived: 'readonly', $effect: 'readonly', $props: 'readonly' },
+    },
+  },
 ]
