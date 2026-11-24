@@ -16,7 +16,7 @@ function remainingFromSaved(saved) {
 
 /**
  * Why a series counts as stopped when it is cut short. An interrupted
- * reshoot goes back to the result from before the reshoot: seriesIndex
+ * reshoot goes back to the result from before the reshoot. seriesIndex
  * already points past the reshot series, so 'aborted' would make Next
  * series skip one.
  */

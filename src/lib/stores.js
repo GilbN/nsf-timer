@@ -27,6 +27,7 @@ import { writable, derived } from 'svelte/store'
  * @property {string | null} reshootPeerName
  * @property {boolean} stageComplete
  * @property {string | null} [stoppedReason]
+ * @property {string | null} [preReshootStoppedReason] the result a reshoot returns to
  */
 
 // View routing
