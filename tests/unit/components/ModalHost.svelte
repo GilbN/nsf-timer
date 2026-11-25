@@ -1,11 +1,11 @@
 <script>
   import Modal from '../../../src/components/Modal.svelte'
 
-  let { show = true, onClose } = $props()
+  let { show = true, onClose, variant = undefined } = $props()
 </script>
 
 {#if show}
-  <Modal {onClose}>
+  <Modal {onClose} {variant}>
     <p>content</p>
   </Modal>
 {/if}
